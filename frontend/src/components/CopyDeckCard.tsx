@@ -95,30 +95,30 @@ export function CopyDeckCard({
   const hasContent = socialPosts.length > 0 || metaAds.length > 0;
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#121216] shadow-studio">
+    <div className="flex flex-col overflow-hidden rounded-[22px] border border-black/[0.06] bg-white shadow-apple">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.07] px-5 py-4">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-cyan-500/35 bg-cyan-500/15">
-            <PenTool className="h-4 w-4 text-cyan-300" />
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] px-6 py-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F5F5F7] text-[#1D1D1F]">
+            <PenTool className="h-4 w-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold text-white">
-                Matching Copy Deck
+              <h3 className="text-[15px] font-semibold tracking-[-0.015em] text-[#1D1D1F]">
+                Copy Deck
               </h3>
-              <span className="rounded-md border border-cyan-500/30 bg-cyan-500/10 px-1.5 py-0.5 font-mono text-[10px] text-cyan-300">
+              <span className="rounded-full bg-[#F5F5F7] px-2 py-0.5 font-mono text-[10px] font-medium text-[#6E6E73]">
                 @CopyAgent
               </span>
             </div>
-            <p className="text-xs text-zinc-400">
-              Platform-native posts, Meta Ads preview &amp; hashtag taxonomy
+            <p className="text-[12px] text-[#6E6E73]">
+              Platform-native posts, ad preview &amp; hashtags
             </p>
           </div>
         </div>
 
-        {/* Platform Tabs */}
-        <div className="flex rounded-xl border border-white/[0.08] bg-[#09090B] p-1">
+        {/* Classic Apple Segmented Tabs */}
+        <div className="flex rounded-full bg-[#F5F5F7] p-1">
           {tabs.map((tab) => {
             const active = activeTab === tab;
             const inBrief = selectedPlatforms.includes(tab);
@@ -128,21 +128,21 @@ export function CopyDeckCard({
                 type="button"
                 onClick={() => setActiveTab(tab)}
                 className={cn(
-                  "relative rounded-lg px-2.5 py-1.5 text-xs font-medium transition",
-                  active ? "text-white" : "text-zinc-400 hover:text-zinc-200"
+                  "relative rounded-full px-3 py-1.5 text-[12px] font-medium transition",
+                  active ? "text-[#1D1D1F]" : "text-[#6E6E73] hover:text-[#1D1D1F]"
                 )}
               >
                 {active && (
                   <motion.span
                     layoutId="copyDeckTabBg"
-                    transition={{ type: "spring", stiffness: 360, damping: 30 }}
-                    className="absolute inset-0 rounded-lg bg-white/[0.1]"
+                    transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                    className="absolute inset-0 rounded-full bg-white shadow-apple-pill"
                   />
                 )}
                 <span className="relative z-10 flex items-center gap-1.5">
                   <span>{tab}</span>
                   {!inBrief && (
-                    <span className="h-1.5 w-1.5 rounded-full bg-zinc-600" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#D2D2D7]" />
                   )}
                 </span>
               </button>
@@ -151,31 +151,31 @@ export function CopyDeckCard({
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* Body */}
       {!hasContent ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-10 text-center">
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-12 text-center">
           {isLoading ? (
             <>
-              <div className="h-12 w-12 animate-pulse rounded-2xl border border-cyan-500/40 bg-cyan-500/15 p-3">
-                <Sparkles className="h-full w-full text-cyan-300" />
+              <div className="flex h-12 w-12 animate-pulse items-center justify-center rounded-full bg-[#0071E3]/[0.1] text-[#0071E3]">
+                <Sparkles className="h-5 w-5" />
               </div>
-              <p className="text-sm font-medium text-zinc-200">
-                @CopyAgent is awaiting visual handoff &amp; drafting platform copy...
+              <p className="text-[15px] font-semibold tracking-[-0.01em] text-[#1D1D1F]">
+                Drafting synchronized platform copy…
               </p>
-              <p className="font-mono text-xs text-zinc-500">
-                Synchronizing brand voice with visual lighting &amp; mood tokens
+              <p className="text-[13px] text-[#6E6E73]">
+                @CopyAgent is aligning tone and hooks to the visual brief.
               </p>
             </>
           ) : (
-            <p className="text-sm text-zinc-500">
-              Generated Instagram, LinkedIn, and Meta Ads copy will populate here.
+            <p className="text-[14px] text-[#86868B]">
+              Instagram, LinkedIn, and Meta Ads copy will appear here.
             </p>
           )}
         </div>
       ) : (
-        <div className="flex flex-1 flex-col justify-between gap-5 p-5">
+        <div className="flex flex-1 flex-col justify-between gap-5 p-6">
           <div className="space-y-4">
-            {/* Social Posts Tab (Instagram / LinkedIn) */}
+            {/* Instagram & LinkedIn Posts */}
             {activeTab !== "Meta Ads" && (
               <div className="space-y-3.5">
                 {filteredPosts.map((post) => {
@@ -184,37 +184,37 @@ export function CopyDeckCard({
                   return (
                     <div
                       key={post.id}
-                      className="rounded-xl border border-white/[0.08] bg-[#0C0C10] p-4 transition hover:border-white/[0.15]"
+                      className="rounded-2xl border border-black/[0.06] bg-[#F5F5F7] p-4 transition hover:border-black/[0.12]"
                     >
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.06] pb-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/[0.06] pb-3">
                         <div className="flex items-center gap-2">
-                          <span className="rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase text-cyan-300">
+                          <span className="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-semibold text-[#1D1D1F] shadow-sm">
                             {post.variantLabel}
                           </span>
-                          <span className="inline-flex items-center gap-1 font-mono text-[10px] text-zinc-400">
-                            <Clock className="h-3 w-3 text-zinc-500" />
+                          <span className="inline-flex items-center gap-1 text-[11px] text-[#6E6E73]">
+                            <Clock className="h-3 w-3 text-[#86868B]" />
                             {post.bestTimeToPost}
                           </span>
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] text-emerald-300">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-[#248A3D]/10 px-2.5 py-0.5 text-[11px] font-medium text-[#1D6F31]">
                             <TrendingUp className="h-3 w-3" />
                             {post.estimatedEngagement}
                           </span>
                           <button
                             type="button"
                             onClick={() => handleCopy(post.id, fullPostText)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-white/[0.1] bg-[#16161D] px-2.5 py-1 text-[11px] font-medium text-zinc-200 transition hover:border-cyan-400/50 hover:text-white"
+                            className="inline-flex items-center gap-1 rounded-full border border-black/[0.08] bg-white px-2.5 py-1 text-[11px] font-medium text-[#1D1D1F] transition hover:border-black/[0.2]"
                           >
                             {isCopied ? (
                               <>
-                                <Check className="h-3 w-3 text-emerald-400" />
-                                <span className="text-emerald-300">Copied</span>
+                                <Check className="h-3 w-3 text-[#248A3D]" />
+                                <span className="text-[#1D6F31]">Copied</span>
                               </>
                             ) : (
                               <>
-                                <Copy className="h-3 w-3 text-zinc-400" />
+                                <Copy className="h-3 w-3 text-[#6E6E73]" />
                                 <span>Copy</span>
                               </>
                             )}
@@ -223,15 +223,15 @@ export function CopyDeckCard({
                       </div>
 
                       <div className="mt-3 space-y-2.5">
-                        <p className="text-sm font-semibold leading-snug text-white">
+                        <p className="text-[14px] font-semibold leading-snug tracking-[-0.01em] text-[#1D1D1F]">
                           {post.hook}
                         </p>
-                        <p className="whitespace-pre-line text-xs leading-relaxed text-zinc-300">
+                        <p className="whitespace-pre-line text-[13px] leading-relaxed text-[#424245]">
                           {post.body}
                         </p>
-                        <div className="rounded-lg border border-violet-500/25 bg-violet-500/[0.07] px-3 py-2 text-xs text-violet-200">
-                          <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-violet-300">
-                            CTA:{" "}
+                        <div className="rounded-xl bg-white px-3.5 py-2.5 text-[12px] text-[#1D1D1F] shadow-sm">
+                          <span className="font-semibold text-[#0066CC]">
+                            Call to Action:{" "}
                           </span>
                           {post.callToAction}
                         </div>
@@ -245,7 +245,6 @@ export function CopyDeckCard({
             {/* Meta Ads Tab */}
             {activeTab === "Meta Ads" && activeMetaAd && (
               <div className="space-y-4">
-                {/* Variant Selector */}
                 {metaAds.length > 1 && (
                   <div className="flex flex-wrap gap-2">
                     {metaAds.map((variant, idx) => (
@@ -254,10 +253,10 @@ export function CopyDeckCard({
                         type="button"
                         onClick={() => setActiveMetaIndex(idx)}
                         className={cn(
-                          "rounded-lg border px-3 py-1.5 text-xs font-medium transition",
+                          "rounded-full border px-3.5 py-1.5 text-[12px] font-medium transition",
                           idx === activeMetaIndex
-                            ? "border-violet-400/60 bg-violet-500/15 text-white"
-                            : "border-white/[0.08] bg-[#0B0B0F] text-zinc-400 hover:border-white/20 hover:text-zinc-200"
+                            ? "border-[#1D1D1F] bg-[#1D1D1F] text-white"
+                            : "border-black/[0.08] bg-[#F5F5F7] text-[#6E6E73] hover:text-[#1D1D1F]"
                         )}
                       >
                         Variant 0{idx + 1}: {variant.angle}
@@ -266,12 +265,12 @@ export function CopyDeckCard({
                   </div>
                 )}
 
-                {/* Copy Spec Fields */}
-                <div className="space-y-2.5 rounded-xl border border-white/[0.08] bg-[#0C0C10] p-4">
+                {/* Copy Spec */}
+                <div className="space-y-3 rounded-2xl bg-[#F5F5F7] p-4">
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-widest text-violet-300">
-                      <Megaphone className="h-3 w-3" />
-                      Meta Ad Copy Spec
+                    <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[#1D1D1F]">
+                      <Megaphone className="h-3.5 w-3.5 text-[#0071E3]" />
+                      Ad Copy Specification
                     </span>
                     <button
                       type="button"
@@ -281,45 +280,45 @@ export function CopyDeckCard({
                           `Headline: ${activeMetaAd.headline}\nPrimary Text: ${activeMetaAd.primaryText}\nDescription: ${activeMetaAd.description}\nCTA: ${activeMetaAd.ctaLabel}`
                         )
                       }
-                      className="inline-flex items-center gap-1 rounded-lg border border-white/[0.1] bg-[#16161D] px-2.5 py-1 text-[11px] font-medium text-zinc-200 transition hover:border-cyan-400/50"
+                      className="inline-flex items-center gap-1 rounded-full border border-black/[0.08] bg-white px-2.5 py-1 text-[11px] font-medium text-[#1D1D1F] transition hover:border-black/[0.2]"
                     >
                       {copiedId === activeMetaAd.id ? (
                         <>
-                          <Check className="h-3 w-3 text-emerald-400" />
-                          <span className="text-emerald-300">Copied</span>
+                          <Check className="h-3 w-3 text-[#248A3D]" />
+                          <span className="text-[#1D6F31]">Copied</span>
                         </>
                       ) : (
                         <>
-                          <Copy className="h-3 w-3 text-zinc-400" />
+                          <Copy className="h-3 w-3 text-[#6E6E73]" />
                           <span>Copy Ad</span>
                         </>
                       )}
                     </button>
                   </div>
 
-                  <div className="space-y-2 text-xs">
+                  <div className="space-y-2.5 text-[13px]">
                     <div>
-                      <span className="font-mono text-[10px] uppercase text-zinc-500">
+                      <span className="text-[11px] font-medium text-[#86868B]">
                         Primary Text
                       </span>
-                      <p className="mt-0.5 leading-relaxed text-zinc-200">
+                      <p className="mt-0.5 leading-relaxed text-[#1D1D1F]">
                         {activeMetaAd.primaryText}
                       </p>
                     </div>
-                    <div className="grid grid-cols-1 gap-2 pt-1 sm:grid-cols-2">
-                      <div className="rounded-lg border border-white/[0.06] bg-[#14141A] p-2.5">
-                        <span className="font-mono text-[10px] uppercase text-zinc-500">
+                    <div className="grid grid-cols-1 gap-2.5 pt-1 sm:grid-cols-2">
+                      <div className="rounded-xl bg-white p-3 shadow-sm">
+                        <span className="text-[11px] font-medium text-[#86868B]">
                           Headline
                         </span>
-                        <p className="mt-0.5 font-semibold text-white">
+                        <p className="mt-0.5 text-[13px] font-semibold text-[#1D1D1F]">
                           {activeMetaAd.headline}
                         </p>
                       </div>
-                      <div className="rounded-lg border border-white/[0.06] bg-[#14141A] p-2.5">
-                        <span className="font-mono text-[10px] uppercase text-zinc-500">
+                      <div className="rounded-xl bg-white p-3 shadow-sm">
+                        <span className="text-[11px] font-medium text-[#86868B]">
                           Description
                         </span>
-                        <p className="mt-0.5 text-zinc-300">
+                        <p className="mt-0.5 text-[12px] text-[#424245]">
                           {activeMetaAd.description}
                         </p>
                       </div>
@@ -327,33 +326,33 @@ export function CopyDeckCard({
                   </div>
                 </div>
 
-                {/* Live Meta Ad CTA Preview Card */}
-                <div className="overflow-hidden rounded-2xl border border-white/[0.1] bg-[#0A0A0E]">
+                {/* Light-Mode Meta Ad Feed Preview */}
+                <div className="overflow-hidden rounded-2xl border border-black/[0.08] bg-white shadow-sm">
                   <div className="flex items-center justify-between px-4 py-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-cyan-500 text-xs font-bold text-white">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1D1D1F] text-[11px] font-semibold text-white">
                         {(assets?.brief.productName || "AP").slice(0, 2).toUpperCase()}
                       </div>
                       <div>
-                        <div className="text-xs font-semibold text-white">
+                        <div className="text-[13px] font-semibold text-[#1D1D1F]">
                           {assets?.brief.productName || "Brand Studio"}
                         </div>
-                        <div className="font-mono text-[10px] text-zinc-400">
+                        <div className="text-[11px] text-[#86868B]">
                           Sponsored · Meta Feed Preview
                         </div>
                       </div>
                     </div>
-                    <span className="rounded-full border border-white/10 px-2 py-0.5 font-mono text-[10px] text-zinc-400">
-                      AD PREVIEW
+                    <span className="rounded-full bg-[#F5F5F7] px-2.5 py-0.5 text-[10px] font-medium text-[#6E6E73]">
+                      Ad Preview
                     </span>
                   </div>
 
-                  <p className="px-4 pb-3 text-xs leading-relaxed text-zinc-300">
+                  <p className="px-4 pb-3 text-[13px] leading-relaxed text-[#424245]">
                     {activeMetaAd.primaryText}
                   </p>
 
                   {metaPreviewCreative && (
-                    <div className="aspect-[16/9] w-full overflow-hidden border-y border-white/[0.08] bg-black">
+                    <div className="aspect-[16/9] w-full overflow-hidden border-y border-black/[0.06] bg-[#F5F5F7]">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={metaPreviewCreative.imageUrl}
@@ -363,15 +362,15 @@ export function CopyDeckCard({
                     </div>
                   )}
 
-                  <div className="flex flex-wrap items-center justify-between gap-3 bg-[#14141B] px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3 bg-[#FBFBFD] px-4 py-3">
                     <div className="min-w-0 flex-1">
-                      <div className="font-mono text-[10px] uppercase tracking-wider text-zinc-400">
+                      <div className="text-[10px] font-medium uppercase tracking-wide text-[#86868B]">
                         {activeMetaAd.displayUrl}
                       </div>
-                      <div className="truncate text-sm font-semibold text-white">
+                      <div className="truncate text-[14px] font-semibold text-[#1D1D1F]">
                         {activeMetaAd.headline}
                       </div>
-                      <div className="truncate text-[11px] text-zinc-400">
+                      <div className="truncate text-[12px] text-[#6E6E73]">
                         {activeMetaAd.description}
                       </div>
                     </div>
@@ -384,7 +383,7 @@ export function CopyDeckCard({
                           activeMetaAd.ctaLabel
                         )
                       }
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-gradient-to-r from-[#8B5CF6] to-[#06B6D4] px-4 py-2 text-xs font-bold text-white shadow-violet-glow transition hover:brightness-110"
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#0071E3] px-4 py-2 text-[12px] font-medium text-white transition hover:bg-[#0077ED]"
                     >
                       <span>{activeMetaAd.ctaLabel}</span>
                       <ExternalLink className="h-3.5 w-3.5" />
@@ -394,20 +393,20 @@ export function CopyDeckCard({
               </div>
             )}
 
-            {/* Hashtag Pills */}
+            {/* Curated Hashtags */}
             {hashtags.length > 0 && (
-              <div className="space-y-2.5 rounded-xl border border-white/[0.07] bg-[#0C0C10] p-4">
+              <div className="space-y-2.5 rounded-2xl bg-[#F5F5F7] p-4">
                 <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-widest text-zinc-400">
-                    <Hash className="h-3 w-3 text-cyan-400" />
-                    Curated Hashtags · Click Pill to Copy
+                  <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[#1D1D1F]">
+                    <Hash className="h-3.5 w-3.5 text-[#6E6E73]" />
+                    Hashtags
                   </span>
                   <button
                     type="button"
                     onClick={() => handleCopy("all-tags", hashtags.join(" "))}
-                    className="font-mono text-[10px] text-cyan-300 transition hover:text-cyan-200"
+                    className="text-[12px] font-medium text-[#0066CC] transition hover:underline"
                   >
-                    {copiedId === "all-tags" ? "✓ Copied All" : "Copy All"}
+                    {copiedId === "all-tags" ? "Copied all" : "Copy all"}
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -419,10 +418,10 @@ export function CopyDeckCard({
                         type="button"
                         onClick={() => handleCopy(tag, tag)}
                         className={cn(
-                          "rounded-full border px-2.5 py-1 font-mono text-[11px] transition",
+                          "rounded-full border px-3 py-1 text-[12px] font-medium transition",
                           isCopied
-                            ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-300"
-                            : "border-white/[0.09] bg-[#16161D] text-zinc-300 hover:border-cyan-400/50 hover:text-white"
+                            ? "border-[#248A3D]/30 bg-[#248A3D]/10 text-[#1D6F31]"
+                            : "border-black/[0.06] bg-white text-[#424245] hover:border-black/[0.2] hover:text-[#1D1D1F]"
                         )}
                       >
                         {isCopied ? `✓ ${tag}` : tag}
@@ -434,22 +433,22 @@ export function CopyDeckCard({
             )}
           </div>
 
-          {/* Export & Clipboard Footer Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-white/[0.08] pt-4">
+          {/* Classic Apple Export Footer */}
+          <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-black/[0.06] pt-4">
             <button
               type="button"
               onClick={handleCopyFullDeck}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/[0.1] bg-[#0B0B0F] px-3.5 py-2 text-xs font-semibold text-zinc-200 transition hover:border-white/25 hover:text-white"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#D2D2D7] bg-white px-4 py-2 text-[12px] font-medium text-[#1D1D1F] transition hover:border-[#86868B] hover:bg-[#F5F5F7]"
             >
               {copiedId === "full-deck" ? (
                 <>
-                  <Check className="h-3.5 w-3.5 text-emerald-400" />
-                  <span className="text-emerald-300">Copied Full Copy Deck</span>
+                  <Check className="h-3.5 w-3.5 text-[#248A3D]" />
+                  <span className="text-[#1D6F31]">Copied Deck</span>
                 </>
               ) : (
                 <>
-                  <Copy className="h-3.5 w-3.5 text-cyan-400" />
-                  <span>Copy to Clipboard</span>
+                  <Copy className="h-3.5 w-3.5 text-[#6E6E73]" />
+                  <span>Copy All</span>
                 </>
               )}
             </button>
@@ -459,19 +458,19 @@ export function CopyDeckCard({
                 type="button"
                 disabled={!assets}
                 onClick={onExportJson}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-white/[0.1] bg-[#18181F] px-3.5 py-2 text-xs font-semibold text-zinc-100 transition hover:border-cyan-400/50 hover:text-white disabled:opacity-40"
+                className="inline-flex items-center gap-1.5 rounded-full border border-[#D2D2D7] bg-white px-4 py-2 text-[12px] font-medium text-[#1D1D1F] transition hover:border-[#86868B] hover:bg-[#F5F5F7] disabled:opacity-40"
               >
-                <FileJson className="h-3.5 w-3.5 text-cyan-400" />
-                <span>Export .JSON</span>
+                <FileJson className="h-3.5 w-3.5 text-[#6E6E73]" />
+                <span>JSON</span>
               </button>
               <button
                 type="button"
                 disabled={!assets || isExportingZip}
                 onClick={onExportZip}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#8B5CF6] to-[#06B6D4] px-4 py-2 text-xs font-semibold text-white shadow-violet-glow transition hover:brightness-110 disabled:opacity-40"
+                className="inline-flex items-center gap-1.5 rounded-full bg-[#0071E3] px-4 py-2 text-[12px] font-medium text-white transition hover:bg-[#0077ED] disabled:opacity-40"
               >
                 <Download className="h-3.5 w-3.5" />
-                <span>{isExportingZip ? "Building .ZIP..." : "Export Kit .ZIP"}</span>
+                <span>{isExportingZip ? "Packing…" : "Export Kit"}</span>
               </button>
             </div>
           </div>

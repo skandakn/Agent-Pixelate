@@ -85,92 +85,92 @@ export function VisualShowcaseCard({
   };
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#121216] shadow-studio">
+    <div className="flex flex-col overflow-hidden rounded-[22px] border border-black/[0.06] bg-white shadow-apple">
       {/* Card Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.07] px-5 py-4">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-violet-500/35 bg-violet-500/15">
-            <Palette className="h-4 w-4 text-violet-300" />
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] px-6 py-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F5F5F7] text-[#1D1D1F]">
+            <Palette className="h-4 w-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold text-white">
+              <h3 className="text-[15px] font-semibold tracking-[-0.015em] text-[#1D1D1F]">
                 Visual Showcase
               </h3>
-              <span className="rounded-md border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 font-mono text-[10px] text-violet-300">
+              <span className="rounded-full bg-[#F5F5F7] px-2 py-0.5 font-mono text-[10px] font-medium text-[#6E6E73]">
                 @VisualAgent
               </span>
             </div>
-            <p className="text-xs text-zinc-400">
-              Art-directed creatives, brand swatches &amp; 15s motion storyboard
+            <p className="text-[12px] text-[#6E6E73]">
+              Art-directed creatives, color system &amp; 15s storyboard
             </p>
           </div>
         </div>
 
-        {/* Mode Switcher */}
-        <div className="flex rounded-xl border border-white/[0.08] bg-[#09090B] p-1">
+        {/* Classic Apple Segmented Switcher */}
+        <div className="flex rounded-full bg-[#F5F5F7] p-1">
           <button
             type="button"
             onClick={() => setActiveTab("creatives")}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition",
+              "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-medium transition",
               activeTab === "creatives"
-                ? "bg-violet-500/20 text-white shadow-inner"
-                : "text-zinc-400 hover:text-zinc-200"
+                ? "bg-white text-[#1D1D1F] shadow-apple-pill"
+                : "text-[#6E6E73] hover:text-[#1D1D1F]"
             )}
           >
-            <ImageIcon className="h-3.5 w-3.5 text-violet-300" />
+            <ImageIcon className="h-3.5 w-3.5" />
             <span>Creatives ({creatives.length})</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("storyboard")}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition",
+              "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-medium transition",
               activeTab === "storyboard"
-                ? "bg-cyan-500/20 text-white shadow-inner"
-                : "text-zinc-400 hover:text-zinc-200"
+                ? "bg-white text-[#1D1D1F] shadow-apple-pill"
+                : "text-[#6E6E73] hover:text-[#1D1D1F]"
             )}
           >
-            <Film className="h-3.5 w-3.5 text-cyan-300" />
-            <span>Video Storyboard</span>
+            <Film className="h-3.5 w-3.5" />
+            <span>Storyboard</span>
           </button>
         </div>
       </div>
 
-      {/* Loading Skeleton when VisualAgent is rendering */}
+      {/* Loading / Empty State */}
       {creatives.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-10 text-center">
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-12 text-center">
           {isLoading ? (
             <>
-              <div className="h-12 w-12 animate-pulse rounded-2xl border border-violet-500/40 bg-violet-500/15 p-3">
-                <Sparkles className="h-full w-full text-violet-300" />
+              <div className="flex h-12 w-12 animate-pulse items-center justify-center rounded-full bg-[#0071E3]/[0.1] text-[#0071E3]">
+                <Sparkles className="h-5 w-5" />
               </div>
-              <p className="text-sm font-medium text-zinc-200">
-                @VisualAgent is composing key visuals &amp; lighting grids...
+              <p className="text-[15px] font-semibold tracking-[-0.01em] text-[#1D1D1F]">
+                Composing key visuals and lighting grids…
               </p>
-              <p className="font-mono text-xs text-zinc-500">
-                Rendering color palette tokens and storyboard frames
+              <p className="text-[13px] text-[#6E6E73]">
+                @VisualAgent is rendering aspect creatives, swatches, and motion frames.
               </p>
             </>
           ) : (
-            <p className="text-sm text-zinc-500">
+            <p className="text-[14px] text-[#86868B]">
               Visual assets will appear here once agents launch.
             </p>
           )}
         </div>
       ) : (
-        <div className="flex flex-1 flex-col gap-5 p-5">
+        <div className="flex flex-1 flex-col gap-5 p-6">
           {activeTab === "creatives" && activeCreative ? (
             <>
-              {/* Hero Carousel Stage */}
-              <div className="relative overflow-hidden rounded-2xl border border-white/[0.09] bg-[#08080B]">
+              {/* Hero Gallery Stage */}
+              <div className="relative overflow-hidden rounded-[18px] border border-black/[0.06] bg-[#1D1D1F]">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={activeCreative.id}
-                    initial={{ opacity: 0, scale: 0.985 }}
+                    initial={{ opacity: 0, scale: 0.99 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.985 }}
+                    exit={{ opacity: 0, scale: 0.99 }}
                     transition={{ duration: 0.25 }}
                     className="relative aspect-[16/10] w-full overflow-hidden"
                   >
@@ -181,36 +181,36 @@ export function VisualShowcaseCard({
                       className="h-full w-full object-cover"
                     />
 
-                    {/* Subtle Overlay Metadata */}
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-4 pt-12">
+                    {/* Subtle Editorial Caption Scrim */}
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/30 to-transparent p-5 pt-14">
                       <div className="flex flex-wrap items-end justify-between gap-2">
                         <div>
-                          <span className="inline-block rounded-full border border-white/15 bg-black/55 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-cyan-300 backdrop-blur-md">
+                          <span className="inline-block rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-medium text-white backdrop-blur-md">
                             {activeCreative.platform} · {activeCreative.aspectRatio}
                           </span>
-                          <h4 className="mt-1.5 text-sm font-semibold text-white sm:text-base">
+                          <h4 className="mt-2 text-[16px] font-semibold tracking-[-0.015em] text-white sm:text-[18px]">
                             {activeCreative.title}
                           </h4>
-                          <p className="text-xs text-zinc-300">
+                          <p className="text-[12px] text-white/80">
                             {activeCreative.subtitle}
                           </p>
                         </div>
-                        <span className="font-mono text-xs text-zinc-400">
-                          0{selectedIndex + 1} / 0{creatives.length}
+                        <span className="rounded-full bg-black/40 px-2.5 py-1 font-mono text-[11px] text-white/90 backdrop-blur-md">
+                          {selectedIndex + 1} / {creatives.length}
                         </span>
                       </div>
                     </div>
                   </motion.div>
                 </AnimatePresence>
 
-                {/* Carousel Controls */}
+                {/* Apple-Style Translucent Circular Gallery Arrows */}
                 {creatives.length > 1 && (
                   <>
                     <button
                       type="button"
                       onClick={handlePrev}
                       aria-label="Previous creative"
-                      className="absolute left-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-black/60 text-white backdrop-blur-md transition hover:border-violet-400/60 hover:bg-black/80"
+                      className="absolute left-3.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-[#1D1D1F] shadow-md backdrop-blur-md transition hover:bg-white"
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </button>
@@ -218,7 +218,7 @@ export function VisualShowcaseCard({
                       type="button"
                       onClick={handleNext}
                       aria-label="Next creative"
-                      className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-black/60 text-white backdrop-blur-md transition hover:border-violet-400/60 hover:bg-black/80"
+                      className="absolute right-3.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-[#1D1D1F] shadow-md backdrop-blur-md transition hover:bg-white"
                     >
                       <ChevronRight className="h-4 w-4" />
                     </button>
@@ -226,8 +226,8 @@ export function VisualShowcaseCard({
                 )}
               </div>
 
-              {/* Thumbnail Grid Strip */}
-              <div className="grid grid-cols-3 gap-2.5">
+              {/* Clean Thumbnail Strip */}
+              <div className="grid grid-cols-3 gap-3">
                 {creatives.map((creative, idx) => {
                   const selected = idx === selectedIndex;
                   return (
@@ -236,25 +236,25 @@ export function VisualShowcaseCard({
                       type="button"
                       onClick={() => setSelectedIndex(idx)}
                       className={cn(
-                        "group relative overflow-hidden rounded-xl border text-left transition",
+                        "group overflow-hidden rounded-2xl border text-left transition",
                         selected
-                          ? "border-violet-400/80 ring-2 ring-violet-500/25"
-                          : "border-white/[0.08] opacity-70 hover:border-white/25 hover:opacity-100"
+                          ? "border-[#0071E3] ring-2 ring-[#0071E3]/20"
+                          : "border-black/[0.08] opacity-80 hover:border-black/[0.2] hover:opacity-100"
                       )}
                     >
-                      <div className="aspect-[16/10] w-full overflow-hidden bg-[#09090B]">
+                      <div className="aspect-[16/10] w-full overflow-hidden bg-[#F5F5F7]">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={creative.imageUrl}
                           alt={creative.title}
-                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                         />
                       </div>
-                      <div className="bg-[#0D0D12] px-2.5 py-1.5">
-                        <div className="truncate text-[11px] font-medium text-zinc-200">
+                      <div className="bg-white px-3 py-2">
+                        <div className="truncate text-[12px] font-medium text-[#1D1D1F]">
                           {creative.platform}
                         </div>
-                        <div className="font-mono text-[10px] text-zinc-500">
+                        <div className="text-[11px] text-[#86868B]">
                           {creative.format}
                         </div>
                       </div>
@@ -263,21 +263,25 @@ export function VisualShowcaseCard({
                 })}
               </div>
 
-              {/* Color Palette Swatches (Click-to-Copy Hex) */}
-              <div className="space-y-2.5 rounded-xl border border-white/[0.07] bg-[#0C0C10] p-4">
+              {/* Color Palette System */}
+              <div className="space-y-3 rounded-2xl bg-[#F5F5F7] p-4">
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-[10px] font-semibold uppercase tracking-widest text-zinc-400">
-                    Generated Color System · Click to Copy Hex
+                  <span className="text-[12px] font-semibold tracking-[-0.01em] text-[#1D1D1F]">
+                    Color System
                   </span>
-                  {copiedHex && (
-                    <span className="inline-flex items-center gap-1 font-mono text-[10px] text-emerald-400">
-                      <Check className="h-3 w-3" />
-                      Copied {copiedHex}
-                    </span>
-                  )}
+                  <span className="text-[11px] text-[#6E6E73]">
+                    {copiedHex ? (
+                      <span className="inline-flex items-center gap-1 font-medium text-[#248A3D]">
+                        <Check className="h-3 w-3" />
+                        Copied {copiedHex}
+                      </span>
+                    ) : (
+                      "Click swatch to copy hex"
+                    )}
+                  </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
                   {palette.map((swatch) => {
                     const isCopied = copiedHex === swatch.hex;
                     return (
@@ -285,25 +289,25 @@ export function VisualShowcaseCard({
                         key={swatch.hex}
                         type="button"
                         onClick={() => handleCopyHex(swatch.hex)}
-                        className="group flex flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-[#14141A] text-left transition hover:-translate-y-0.5 hover:border-white/25"
+                        className="group flex flex-col overflow-hidden rounded-xl border border-black/[0.06] bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                       >
                         <div
                           className="relative h-11 w-full"
                           style={{ backgroundColor: swatch.hex }}
                         >
-                          <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-md bg-black/50 text-white opacity-0 backdrop-blur-sm transition group-hover:opacity-100">
+                          <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-white/85 text-[#1D1D1F] opacity-0 backdrop-blur-sm transition group-hover:opacity-100">
                             {isCopied ? (
-                              <Check className="h-3 w-3 text-emerald-400" />
+                              <Check className="h-3 w-3 text-[#248A3D]" />
                             ) : (
                               <Copy className="h-3 w-3" />
                             )}
                           </span>
                         </div>
                         <div className="p-2">
-                          <div className="font-mono text-[11px] font-semibold text-zinc-100">
+                          <div className="font-mono text-[11px] font-semibold text-[#1D1D1F]">
                             {swatch.hex}
                           </div>
-                          <div className="truncate text-[10px] text-zinc-400">
+                          <div className="truncate text-[10px] text-[#6E6E73]">
                             {swatch.name}
                           </div>
                         </div>
@@ -313,33 +317,33 @@ export function VisualShowcaseCard({
                 </div>
               </div>
 
-              {/* Art Direction Notes */}
-              <div className="space-y-3 rounded-xl border border-white/[0.07] bg-[#0C0C10] p-4">
+              {/* Art Direction Specifications */}
+              <div className="space-y-3 rounded-2xl bg-[#F5F5F7] p-4">
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-[10px] font-semibold uppercase tracking-widest text-violet-300">
+                  <span className="text-[12px] font-semibold tracking-[-0.01em] text-[#1D1D1F]">
                     Art Direction Notes
                   </span>
-                  <span className="font-mono text-[10px] text-zinc-500">
+                  <span className="text-[11px] text-[#86868B]">
                     {activeCreative.format}
                   </span>
                 </div>
-                <p className="text-xs leading-relaxed text-zinc-300">
+                <p className="text-[13px] leading-relaxed text-[#424245]">
                   {activeCreative.artNote || artDirectionSummary}
                 </p>
-                <div className="grid grid-cols-1 gap-2 pt-1 sm:grid-cols-2">
-                  <div className="rounded-lg border border-white/[0.06] bg-[#131319] p-2.5">
-                    <div className="font-mono text-[10px] uppercase text-zinc-500">
-                      Lighting Setup
+                <div className="grid grid-cols-1 gap-2.5 pt-1 sm:grid-cols-2">
+                  <div className="rounded-xl bg-white p-3 shadow-sm">
+                    <div className="text-[11px] font-medium text-[#86868B]">
+                      Lighting
                     </div>
-                    <div className="mt-0.5 text-xs text-zinc-200">
+                    <div className="mt-0.5 text-[12px] font-medium text-[#1D1D1F]">
                       {activeCreative.lighting}
                     </div>
                   </div>
-                  <div className="rounded-lg border border-white/[0.06] bg-[#131319] p-2.5">
-                    <div className="font-mono text-[10px] uppercase text-zinc-500">
+                  <div className="rounded-xl bg-white p-3 shadow-sm">
+                    <div className="text-[11px] font-medium text-[#86868B]">
                       Composition
                     </div>
-                    <div className="mt-0.5 text-xs text-zinc-200">
+                    <div className="mt-0.5 text-[12px] font-medium text-[#1D1D1F]">
                       {activeCreative.composition}
                     </div>
                   </div>
@@ -347,88 +351,88 @@ export function VisualShowcaseCard({
               </div>
             </>
           ) : (
-            /* Video Storyboard / Motion Preview Tab */
+            /* Video Storyboard Tab */
             <div className="space-y-4">
               {activeScene && (
-                <div className="relative overflow-hidden rounded-2xl border border-white/[0.1] bg-[#07070A]">
-                  {/* Animated Motion Preview Stage */}
-                  <div className="relative flex aspect-[16/9] flex-col justify-between overflow-hidden p-5 sm:p-6">
+                <div className="overflow-hidden rounded-[18px] border border-black/[0.08] bg-[#1D1D1F]">
+                  {/* Cinema Preview Frame */}
+                  <div className="relative flex aspect-[16/9] flex-col justify-between overflow-hidden p-6">
                     <motion.div
                       key={activeScene.id}
-                      initial={{ scale: 1.08, opacity: 0.35 }}
+                      initial={{ scale: 1.06, opacity: 0.4 }}
                       animate={{
                         scale: isPlayingMotion ? 1.0 : 1.02,
-                        opacity: 0.72,
+                        opacity: 0.78,
                       }}
                       transition={{ duration: 2.2, ease: "easeOut" }}
                       className="pointer-events-none absolute inset-0"
                       style={{
-                        background: `radial-gradient(circle at 70% 35%, ${activeScene.accentHex}55, transparent 58%), radial-gradient(circle at 25% 80%, ${activeScene.secondaryHex}44, transparent 55%), linear-gradient(135deg, #09090D 0%, #12121A 100%)`,
+                        background: `radial-gradient(circle at 72% 32%, ${activeScene.accentHex}66, transparent 58%), radial-gradient(circle at 24% 82%, ${activeScene.secondaryHex}44, transparent 55%), linear-gradient(135deg, #111113 0%, #1D1D1F 100%)`,
                       }}
                     />
 
-                    {/* Top Motion Telemetry Bar */}
+                    {/* Top Bar */}
                     <div className="relative z-10 flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/60 px-3 py-1 font-mono text-[11px] text-cyan-300 backdrop-blur-md">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[11px] font-medium text-white backdrop-blur-md">
                         <Clapperboard className="h-3.5 w-3.5" />
-                        SCENE 0{activeScene.sceneNumber} · {activeScene.timecode}
+                        Scene 0{activeScene.sceneNumber} · {activeScene.timecode}
                       </span>
                       <button
                         type="button"
                         onClick={() => setIsPlayingMotion((p) => !p)}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-violet-400/50 bg-violet-500/25 px-3.5 py-1.5 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-violet-500/35"
+                        className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-[12px] font-medium text-[#1D1D1F] shadow-sm transition hover:bg-white/90"
                       >
                         {isPlayingMotion ? (
                           <>
                             <Pause className="h-3.5 w-3.5" />
-                            <span>Pause Reel</span>
+                            <span>Pause</span>
                           </>
                         ) : (
                           <>
                             <Play className="h-3.5 w-3.5 fill-current" />
-                            <span>Play Motion Preview</span>
+                            <span>Play Preview</span>
                           </>
                         )}
                       </button>
                     </div>
 
-                    {/* Center Kinetic Caption Preview */}
+                    {/* Center Kinetic Super */}
                     <AnimatePresence mode="wait">
                       <motion.div
                         key={activeScene.id}
-                        initial={{ opacity: 0, y: 14 }}
+                        initial={{ opacity: 0, y: 12 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -12 }}
-                        transition={{ duration: 0.3 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.28 }}
                         className="relative z-10 my-auto max-w-xl"
                       >
-                        <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-zinc-300">
+                        <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-white/70">
                           {activeScene.title}
                         </div>
-                        <div className="mt-2 text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
+                        <div className="mt-2 text-2xl font-semibold tracking-[-0.025em] text-white sm:text-3xl">
                           {activeScene.captionOverlay}
                         </div>
-                        <p className="mt-2 text-xs leading-relaxed text-zinc-300 sm:text-sm">
+                        <p className="mt-2 text-[13px] leading-relaxed text-white/80">
                           {activeScene.visualDirection}
                         </p>
                       </motion.div>
                     </AnimatePresence>
 
-                    {/* Bottom Camera / Audio Cues */}
+                    {/* Camera & Audio Cues */}
                     <div className="relative z-10 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/55 px-3 py-2 text-[11px] text-zinc-200 backdrop-blur-md">
-                        <Camera className="h-3.5 w-3.5 shrink-0 text-violet-300" />
+                      <div className="flex items-center gap-2 rounded-xl bg-black/45 px-3 py-2 text-[11px] text-white/90 backdrop-blur-md">
+                        <Camera className="h-3.5 w-3.5 shrink-0 text-white/75" />
                         <span className="truncate">{activeScene.cameraMove}</span>
                       </div>
-                      <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/55 px-3 py-2 text-[11px] text-zinc-200 backdrop-blur-md">
-                        <Volume2 className="h-3.5 w-3.5 shrink-0 text-cyan-300" />
+                      <div className="flex items-center gap-2 rounded-xl bg-black/45 px-3 py-2 text-[11px] text-white/90 backdrop-blur-md">
+                        <Volume2 className="h-3.5 w-3.5 shrink-0 text-white/75" />
                         <span className="truncate">{activeScene.audioCue}</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Scrubbable Timeline Progress */}
-                  <div className="grid grid-cols-4 gap-1 bg-[#0C0C10] p-2">
+                  {/* Clean Scrubbable Progress Bar */}
+                  <div className="grid grid-cols-4 gap-1.5 bg-[#151517] p-2.5">
                     {storyboard.map((frame, idx) => (
                       <button
                         key={frame.id}
@@ -437,16 +441,11 @@ export function VisualShowcaseCard({
                           setActiveSceneIndex(idx);
                           setIsPlayingMotion(false);
                         }}
-                        className="group space-y-1 text-left"
+                        className="group py-1 text-left"
                       >
-                        <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+                        <div className="h-1 overflow-hidden rounded-full bg-white/20">
                           <div
-                            className={cn(
-                              "h-full rounded-full transition-all duration-300",
-                              idx <= activeSceneIndex
-                                ? "bg-gradient-to-r from-violet-500 to-cyan-400"
-                                : "bg-transparent"
-                            )}
+                            className="h-full rounded-full bg-white transition-all duration-300"
                             style={{ width: idx <= activeSceneIndex ? "100%" : "0%" }}
                           />
                         </div>
@@ -456,8 +455,8 @@ export function VisualShowcaseCard({
                 </div>
               )}
 
-              {/* Storyboard Cards Grid */}
-              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              {/* Scene Selector Grid */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {storyboard.map((frame, idx) => {
                   const selected = idx === activeSceneIndex;
                   return (
@@ -469,22 +468,22 @@ export function VisualShowcaseCard({
                         setIsPlayingMotion(false);
                       }}
                       className={cn(
-                        "rounded-xl border p-3.5 text-left transition",
+                        "rounded-2xl border p-4 text-left transition",
                         selected
-                          ? "border-cyan-400/60 bg-cyan-500/[0.08]"
-                          : "border-white/[0.07] bg-[#0C0C10] hover:border-white/20"
+                          ? "border-[#0071E3] bg-[#0071E3]/[0.05]"
+                          : "border-black/[0.06] bg-[#F5F5F7] hover:border-black/[0.15]"
                       )}
                     >
-                      <div className="flex items-center justify-between font-mono text-[10px]">
-                        <span className="font-semibold text-cyan-300">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-mono font-medium text-[#0066CC]">
                           0{frame.sceneNumber} · {frame.timecode}
                         </span>
-                        <span className="text-zinc-500">{frame.durationSec}s</span>
+                        <span className="text-[#86868B]">{frame.durationSec}s</span>
                       </div>
-                      <div className="mt-1 text-xs font-semibold text-white">
+                      <div className="mt-1.5 text-[13px] font-semibold text-[#1D1D1F]">
                         {frame.title}
                       </div>
-                      <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-zinc-400">
+                      <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-[#6E6E73]">
                         {frame.visualDirection}
                       </p>
                     </button>

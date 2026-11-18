@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  Activity,
   ArrowRightLeft,
   CheckCircle2,
   ChevronDown,
@@ -10,9 +11,7 @@ import {
   FileText,
   Palette,
   PenTool,
-  Radio,
   Sparkles,
-  Terminal,
   Users,
 } from "lucide-react";
 import {
@@ -28,51 +27,44 @@ interface PipelineNodeDef {
   id: PipelineStage;
   label: string;
   sublabel: string;
-  accent: "violet" | "cyan" | "emerald";
   icon: React.ComponentType<{ className?: string }>;
 }
 
 const PIPELINE_NODES: PipelineNodeDef[] = [
   {
     id: "user_brief",
-    label: "User Brief",
+    label: "Brief",
     sublabel: "Product & Tone",
-    accent: "violet",
     icon: FileText,
   },
   {
     id: "band_room",
-    label: "BAND Shared Room",
-    sublabel: "Memory Bus",
-    accent: "cyan",
+    label: "BAND Room",
+    sublabel: "Shared Memory",
     icon: Users,
   },
   {
     id: "visual_agent",
     label: "@VisualAgent",
     sublabel: "Art & Creatives",
-    accent: "violet",
     icon: Palette,
   },
   {
     id: "context_handoff",
-    label: "Context Handoff",
+    label: "Handoff",
     sublabel: "Visual → Copy",
-    accent: "cyan",
     icon: ArrowRightLeft,
   },
   {
     id: "copy_agent",
     label: "@CopyAgent",
-    sublabel: "Posts & Meta Ads",
-    accent: "cyan",
+    sublabel: "Social & Ads",
     icon: PenTool,
   },
   {
     id: "final_campaign",
-    label: "Final Campaign",
-    sublabel: "Export Kit",
-    accent: "emerald",
+    label: "Campaign Kit",
+    sublabel: "Ready to Export",
     icon: Sparkles,
   },
 ];
@@ -120,28 +112,32 @@ export function AgentPipelineGraph({
   }, [events, selectedStageFilter]);
 
   return (
-    <section className="rounded-2xl border border-white/[0.08] bg-[#121216]/95 shadow-studio">
-      {/* Telemetry Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.07] px-4 py-3.5 sm:px-5">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-cyan-500/30 bg-cyan-500/10">
-            <Radio
+    <section className="overflow-hidden rounded-[22px] border border-black/[0.06] bg-white shadow-apple">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] px-5 py-4 sm:px-6">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F5F5F7]">
+            <span
               className={cn(
-                "h-3.5 w-3.5 text-cyan-400",
-                status === "running" && "animate-pulse"
+                "h-2.5 w-2.5 rounded-full",
+                status === "running"
+                  ? "animate-pulse bg-[#0071E3]"
+                  : status === "completed"
+                    ? "bg-[#248A3D]"
+                    : "bg-[#86868B]"
               )}
             />
           </div>
           <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-100 sm:text-sm">
-              Live Multi-Agent Collaboration Pipeline
+            <h2 className="text-[14px] font-semibold tracking-[-0.015em] text-[#1D1D1F]">
+              Multi-Agent Pipeline
             </h2>
-            <p className="font-mono text-[11px] text-zinc-400">
+            <p className="text-[12px] text-[#6E6E73]">
               {status === "running"
-                ? "Streaming real-time BAND shared-room telemetry & context handoff"
+                ? "Live BAND room stream & structured context handoff in progress"
                 : status === "completed"
-                  ? "Pipeline synchronized · Click any node to inspect stage logs"
-                  : "Awaiting brief launch · Ready to connect to BAND multi-agent bus"}
+                  ? "All stages synchronized · Select any node to filter activity"
+                  : "Ready to connect @VisualAgent and @CopyAgent"}
             </p>
           </div>
         </div>
@@ -151,41 +147,34 @@ export function AgentPipelineGraph({
             <button
               type="button"
               onClick={() => setSelectedStageFilter(null)}
-              className="rounded-md border border-violet-500/40 bg-violet-500/15 px-2.5 py-1 font-mono text-[10px] text-violet-200 transition hover:bg-violet-500/25"
+              className="rounded-full bg-[#0071E3]/[0.1] px-3 py-1 text-[11px] font-medium text-[#0066CC] transition hover:bg-[#0071E3]/[0.16]"
             >
-              Filter: {selectedStageFilter} ×
+              Filter: {selectedStageFilter.replace("_", " ")} ×
             </button>
           )}
           <button
             type="button"
             onClick={() => setLogExpanded((v) => !v)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-[#0B0B0F] px-2.5 py-1 font-mono text-[11px] text-zinc-300 transition hover:border-white/20 hover:text-white"
+            className="inline-flex items-center gap-1.5 rounded-full border border-black/[0.08] bg-[#F5F5F7] px-3.5 py-1.5 text-[12px] font-medium text-[#1D1D1F] transition hover:bg-black/[0.06]"
           >
-            <Terminal className="h-3.5 w-3.5 text-cyan-400" />
-            <span>Thoughts ({events.length})</span>
+            <Activity className="h-3.5 w-3.5 text-[#6E6E73]" />
+            <span>Activity ({events.length})</span>
             {logExpanded ? (
-              <ChevronUp className="h-3.5 w-3.5" />
+              <ChevronUp className="h-3.5 w-3.5 text-[#6E6E73]" />
             ) : (
-              <ChevronDown className="h-3.5 w-3.5" />
+              <ChevronDown className="h-3.5 w-3.5 text-[#6E6E73]" />
             )}
           </button>
         </div>
       </div>
 
-      {/* Interactive 6-Node Pipeline Visualizer */}
-      <div className="overflow-x-auto px-4 py-4 sm:px-5">
-        <div className="flex min-w-[760px] items-center justify-between gap-1">
+      {/* 6-Node Horizontal Precision Stepper */}
+      <div className="overflow-x-auto px-5 py-5 sm:px-6">
+        <div className="flex min-w-[760px] items-center justify-between gap-2">
           {PIPELINE_NODES.map((node, index) => {
             const nodeState = getNodeStatus(index);
             const Icon = node.icon;
             const isSelected = selectedStageFilter === node.id;
-
-            const ringColor =
-              node.accent === "violet"
-                ? "border-violet-500/70 bg-violet-500/15 text-violet-200 shadow-violet-glow"
-                : node.accent === "cyan"
-                  ? "border-cyan-400/70 bg-cyan-500/15 text-cyan-100 shadow-cyan-glow"
-                  : "border-emerald-400/70 bg-emerald-500/15 text-emerald-200";
 
             return (
               <React.Fragment key={node.id}>
@@ -197,67 +186,56 @@ export function AgentPipelineGraph({
                     )
                   }
                   className={cn(
-                    "group relative flex w-[132px] shrink-0 flex-col items-center rounded-xl border px-2.5 py-3 text-center transition-all",
+                    "group relative flex w-[132px] shrink-0 flex-col items-center rounded-2xl border px-3 py-3.5 text-center transition-all duration-200",
                     nodeState === "active"
-                      ? ringColor
+                      ? "border-[#0071E3] bg-[#0071E3]/[0.05] text-[#1D1D1F] shadow-sm"
                       : nodeState === "completed"
-                        ? "border-white/[0.14] bg-[#17171F] text-zinc-100 hover:border-white/25"
-                        : "border-white/[0.06] bg-[#0C0C10] text-zinc-500 hover:border-white/15 hover:text-zinc-300",
-                    isSelected && "ring-2 ring-violet-400/80 ring-offset-2 ring-offset-[#121216]"
+                        ? "border-black/[0.08] bg-white text-[#1D1D1F] hover:border-black/[0.16] hover:bg-[#FBFBFD]"
+                        : "border-transparent bg-[#F5F5F7] text-[#6E6E73] hover:bg-[#EFEFF2] hover:text-[#1D1D1F]",
+                    isSelected && "ring-2 ring-[#0071E3] ring-offset-2 ring-offset-white"
                   )}
                 >
-                  {nodeState === "active" && (
-                    <motion.span
-                      layoutId="activePipelineHalo"
-                      className="pointer-events-none absolute -inset-px rounded-xl border border-cyan-400/70"
-                      animate={{ opacity: [0.45, 1, 0.45] }}
-                      transition={{ duration: 1.4, repeat: Infinity }}
-                    />
-                  )}
-
-                  <div className="relative mb-2 flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.09] bg-black/40">
-                    <Icon
-                      className={cn(
-                        "h-4 w-4",
-                        nodeState === "active"
-                          ? node.accent === "violet"
-                            ? "text-violet-300"
-                            : "text-cyan-300"
-                          : nodeState === "completed"
-                            ? "text-emerald-400"
-                            : "text-zinc-500"
-                      )}
-                    />
+                  <div
+                    className={cn(
+                      "relative mb-2 flex h-9 w-9 items-center justify-center rounded-full transition",
+                      nodeState === "active"
+                        ? "bg-[#0071E3] text-white"
+                        : nodeState === "completed"
+                          ? "bg-[#1D1D1F] text-white"
+                          : "bg-white text-[#6E6E73] shadow-sm"
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
                     {nodeState === "completed" && (
-                      <CheckCircle2 className="absolute -right-1.5 -top-1.5 h-3.5 w-3.5 rounded-full bg-[#121216] text-emerald-400" />
+                      <CheckCircle2 className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-white text-[#248A3D]" />
                     )}
                   </div>
 
-                  <span className="text-[11px] font-semibold leading-tight">
+                  <span className="text-[12px] font-semibold leading-tight tracking-[-0.01em]">
                     {node.label}
                   </span>
-                  <span className="mt-0.5 font-mono text-[9px] text-zinc-400">
+                  <span className="mt-0.5 text-[10px] text-[#86868B]">
                     {node.sublabel}
                   </span>
                 </button>
 
-                {/* Animated Connector Beam */}
+                {/* Subtle Precision Connector */}
                 {index < PIPELINE_NODES.length - 1 && (
-                  <div className="relative h-[2px] flex-1 overflow-hidden rounded-full bg-white/[0.08]">
+                  <div className="relative h-[2px] flex-1 overflow-hidden rounded-full bg-black/[0.07]">
                     {getNodeStatus(index) === "completed" && (
                       <motion.div
                         initial={{ scaleX: 0 }}
                         animate={{ scaleX: 1 }}
-                        transition={{ duration: 0.45 }}
-                        className="h-full origin-left bg-gradient-to-r from-violet-500 to-cyan-400"
+                        transition={{ duration: 0.4, ease: "easeOut" }}
+                        className="h-full origin-left bg-[#1D1D1F]"
                       />
                     )}
                     {getNodeStatus(index) === "active" && (
                       <motion.div
-                        className="absolute inset-y-0 w-1/2 bg-gradient-to-r from-transparent via-cyan-400 to-transparent"
+                        className="absolute inset-y-0 w-1/2 bg-gradient-to-r from-transparent via-[#0071E3] to-transparent"
                         animate={{ x: ["-100%", "220%"] }}
                         transition={{
-                          duration: 1.1,
+                          duration: 1.2,
                           repeat: Infinity,
                           ease: "linear",
                         }}
@@ -271,24 +249,23 @@ export function AgentPipelineGraph({
         </div>
       </div>
 
-      {/* Live Terminal-Style Thought Bubbles & Context Handoff Log */}
+      {/* Expandable Activity Stream & BAND Context Handoff */}
       <AnimatePresence initial={false}>
         {logExpanded && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.22 }}
-            className="overflow-hidden border-t border-white/[0.07]"
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden border-t border-black/[0.06]"
           >
-            <div className="grid grid-cols-1 divide-y divide-white/[0.07] xl:grid-cols-12 xl:divide-x xl:divide-y-0">
-              {/* Terminal Stream */}
-              <div className="max-h-52 overflow-y-auto bg-[#0A0A0E] p-3.5 font-mono text-xs xl:col-span-8">
+            <div className="grid grid-cols-1 divide-y divide-black/[0.06] xl:grid-cols-12 xl:divide-x xl:divide-y-0">
+              {/* Activity Feed */}
+              <div className="max-h-52 overflow-y-auto bg-[#FBFBFD] p-4 sm:px-6 xl:col-span-8">
                 {filteredEvents.length === 0 ? (
-                  <div className="flex h-28 flex-col items-center justify-center gap-1.5 text-center text-zinc-500">
-                    <Terminal className="h-4 w-4 text-zinc-600" />
+                  <div className="flex h-24 flex-col items-center justify-center gap-1 text-center text-[13px] text-[#86868B]">
                     <span>
-                      Launch agents from the Brief Studio to watch live thoughts &amp; handoff streams.
+                      Launch agents from the brief to watch live reasoning and handoff events.
                     </span>
                   </div>
                 ) : (
@@ -296,42 +273,42 @@ export function AgentPipelineGraph({
                     {filteredEvents.map((evt) => {
                       const senderClass =
                         evt.sender === "@VisualAgent"
-                          ? "border-violet-500/35 bg-violet-500/10 text-violet-300"
+                          ? "bg-[#1D1D1F] text-white"
                           : evt.sender === "@CopyAgent"
-                            ? "border-cyan-500/35 bg-cyan-500/10 text-cyan-300"
+                            ? "bg-[#0071E3] text-white"
                             : evt.sender === "Orchestrator"
-                              ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-300"
-                              : "border-white/15 bg-white/[0.04] text-zinc-300";
+                              ? "bg-[#248A3D]/10 text-[#1D6F31]"
+                              : "bg-black/[0.06] text-[#1D1D1F]";
 
                       return (
                         <motion.div
                           key={evt.id}
-                          initial={{ opacity: 0, y: 6 }}
+                          initial={{ opacity: 0, y: 4 }}
                           animate={{ opacity: 1, y: 0 }}
                           className={cn(
-                            "rounded-lg border px-3 py-2",
+                            "rounded-xl border px-3.5 py-2.5",
                             evt.type === "handoff"
-                              ? "border-cyan-500/35 bg-gradient-to-r from-violet-500/[0.09] to-cyan-500/[0.09]"
-                              : "border-white/[0.06] bg-[#111116]"
+                              ? "border-[#0071E3]/25 bg-[#0071E3]/[0.04]"
+                              : "border-black/[0.06] bg-white"
                           )}
                         >
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-[10px] text-zinc-500">
-                              [{formatTimeShort(evt.timestamp)}]
+                            <span className="font-mono text-[10px] text-[#86868B]">
+                              {formatTimeShort(evt.timestamp)}
                             </span>
                             <span
                               className={cn(
-                                "rounded border px-1.5 py-0.5 text-[10px] font-semibold",
+                                "rounded-full px-2 py-0.5 text-[10px] font-semibold",
                                 senderClass
                               )}
                             >
                               {evt.sender}
                             </span>
-                            <span className="font-sans text-[11px] font-semibold text-zinc-100">
+                            <span className="text-[12px] font-semibold text-[#1D1D1F]">
                               {evt.title}
                             </span>
                           </div>
-                          <p className="mt-1 leading-relaxed text-zinc-400">
+                          <p className="mt-1 text-[12px] leading-relaxed text-[#6E6E73]">
                             {evt.message}
                           </p>
                         </motion.div>
@@ -342,48 +319,61 @@ export function AgentPipelineGraph({
                 )}
               </div>
 
-              {/* Structured Context Handoff Inspector */}
-              <div className="bg-[#0D0D12] p-3.5 xl:col-span-4">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-cyan-300">
-                    <ArrowRightLeft className="h-3 w-3" />
-                    BAND Context Handoff Packet
+              {/* BAND Context Handoff Inspector */}
+              <div className="bg-white p-4 sm:px-5 xl:col-span-4">
+                <div className="mb-2.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#1D1D1F]">
+                    <ArrowRightLeft className="h-3.5 w-3.5 text-[#0071E3]" />
+                    BAND Context Handoff
                   </span>
-                  <span className="font-mono text-[10px] text-zinc-500">
-                    {handoff ? "SYNCED" : "PENDING"}
+                  <span
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-[10px] font-medium",
+                      handoff
+                        ? "bg-[#248A3D]/10 text-[#1D6F31]"
+                        : "bg-[#F5F5F7] text-[#86868B]"
+                    )}
+                  >
+                    {handoff ? "Synced" : "Pending"}
                   </span>
                 </div>
 
                 {handoff ? (
-                  <div className="space-y-2.5 rounded-xl border border-white/[0.08] bg-[#121218] p-3 font-mono text-[11px]">
-                    <div className="flex items-center justify-between text-[10px]">
-                      <span className="text-violet-300">{handoff.fromAgent}</span>
-                      <span className="text-zinc-500">─────▶</span>
-                      <span className="text-cyan-300">{handoff.toAgent}</span>
+                  <div className="space-y-2 rounded-2xl bg-[#F5F5F7] p-3.5 text-[12px]">
+                    <div className="flex items-center justify-between font-mono text-[11px]">
+                      <span className="font-semibold text-[#1D1D1F]">
+                        {handoff.fromAgent}
+                      </span>
+                      <span className="text-[#86868B]">→</span>
+                      <span className="font-semibold text-[#0071E3]">
+                        {handoff.toAgent}
+                      </span>
+                    </div>
+                    <div className="pt-0.5">
+                      <span className="text-[#86868B]">Mood: </span>
+                      <span className="font-medium text-[#1D1D1F]">
+                        {handoff.dominantMood}
+                      </span>
                     </div>
                     <div>
-                      <span className="text-zinc-500">mood: </span>
-                      <span className="text-zinc-200">{handoff.dominantMood}</span>
+                      <span className="text-[#86868B]">Motif: </span>
+                      <span className="text-[#424245]">{handoff.heroMotif}</span>
                     </div>
-                    <div>
-                      <span className="text-zinc-500">motif: </span>
-                      <span className="text-zinc-300">{handoff.heroMotif}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 pt-0.5">
-                      <span className="text-zinc-500">tokens:</span>
+                    <div className="flex items-center gap-1.5 pt-1">
+                      <span className="text-[#86868B]">Palette:</span>
                       {handoff.paletteHexes.map((hex) => (
                         <span
                           key={hex}
                           title={hex}
-                          className="h-3.5 w-3.5 rounded-sm border border-white/20"
+                          className="h-4 w-4 rounded-full border border-black/10 shadow-sm"
                           style={{ backgroundColor: hex }}
                         />
                       ))}
                     </div>
                   </div>
                 ) : (
-                  <div className="flex h-32 items-center justify-center rounded-xl border border-dashed border-white/[0.08] p-3 text-center font-mono text-[11px] text-zinc-500">
-                    Waiting for @VisualAgent to emit creative context payload for @CopyAgent...
+                  <div className="flex h-28 items-center justify-center rounded-2xl border border-dashed border-black/[0.1] bg-[#FBFBFD] p-4 text-center text-[12px] text-[#86868B]">
+                    Waiting for @VisualAgent to share art direction with @CopyAgent.
                   </div>
                 )}
               </div>

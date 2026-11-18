@@ -5,7 +5,6 @@ import {
   Download,
   FileJson,
   PanelLeft,
-  Radio,
   Sparkles,
   Wifi,
   WifiOff,
@@ -43,97 +42,91 @@ export function TopNav({
   const isLive = resolvedMode === "live" && !preferMockMode;
 
   return (
-    <header className="sticky top-0 z-30 border-b border-white/[0.08] bg-[#09090B]/85 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-[1680px] items-center justify-between gap-4 px-4 sm:px-6">
-        {/* Left: Brand & Mobile Drawer Trigger */}
+    <header className="sticky top-0 z-30 border-b border-black/[0.08] bg-white/80 backdrop-blur-xl">
+      <div className="mx-auto flex h-14 max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6">
+        {/* Left: Minimal Apple-Grade Brand Mark & Mobile Drawer Trigger */}
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={onOpenMobileDrawer}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.08] bg-[#121216] text-zinc-300 transition hover:border-white/20 hover:text-white lg:hidden"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-black/[0.1] bg-[#F5F5F7] text-[#1D1D1F] transition hover:bg-black/[0.06] lg:hidden"
             aria-label="Open Campaign Brief Studio"
           >
             <PanelLeft className="h-4 w-4" />
           </button>
 
           <div className="flex items-center gap-2.5">
-            <div className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-violet-500/40 bg-gradient-to-br from-violet-500/25 via-[#121216] to-cyan-500/20 shadow-violet-glow">
-              <Sparkles className="h-4 w-4 text-violet-300" />
-              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#09090B] bg-cyan-400" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[#1D1D1F] text-white shadow-sm">
+              <Sparkles className="h-4 w-4" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-sm font-bold tracking-tight text-white sm:text-base">
-                  Agent Pixelate
-                </h1>
-                <span className="hidden rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider text-violet-300 sm:inline-block">
-                  BAND Studio
-                </span>
-              </div>
-              <p className="hidden text-[11px] text-zinc-400 md:block">
-                Multi-Agent AI Campaign Orchestrator
-              </p>
+            <div className="flex items-baseline gap-2.5">
+              <h1 className="text-[15px] font-semibold tracking-[-0.02em] text-[#1D1D1F]">
+                Agent Pixelate
+              </h1>
+              <span className="hidden text-xs font-medium text-[#86868B] sm:inline">
+                Campaign Studio
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Center: Active Session Telemetry Pill */}
+        {/* Center: Understated Session Telemetry */}
         <div className="hidden items-center gap-2.5 xl:flex">
           {campaignId && (
-            <div className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-[#121216] px-3 py-1 font-mono text-xs text-zinc-300">
-              <Radio
+            <div className="flex items-center gap-2 rounded-full bg-[#F5F5F7] px-3 py-1 text-[11px] font-medium text-[#6E6E73]">
+              <span
                 className={cn(
-                  "h-3.5 w-3.5",
+                  "h-2 w-2 rounded-full",
                   status === "running"
-                    ? "animate-pulse text-cyan-400"
+                    ? "animate-pulse bg-[#0071E3]"
                     : status === "completed"
-                      ? "text-emerald-400"
-                      : "text-zinc-500"
+                      ? "bg-[#248A3D]"
+                      : "bg-[#86868B]"
                 )}
               />
-              <span className="text-zinc-500">SESSION</span>
-              <span className="text-zinc-100">{campaignId}</span>
+              <span>Session</span>
+              <span className="font-mono text-[#1D1D1F]">{campaignId}</span>
             </div>
           )}
 
           {modeNotice && (
-            <div className="max-w-md truncate rounded-full border border-amber-500/25 bg-amber-500/10 px-3 py-1 font-mono text-[11px] text-amber-300">
+            <div className="max-w-md truncate rounded-full bg-[#F5F5F7] px-3 py-1 text-[11px] font-medium text-[#6E6E73]">
               {modeNotice}
             </div>
           )}
         </div>
 
-        {/* Right: Mode Toggle & Export Controls */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        {/* Right: Clean Connection Pill & Classic Apple Pill CTAs */}
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={onToggleMockMode}
-            title="Toggle between Live localhost:8000 WebSocket and Simulated Mock Mode"
+            title="Toggle between Live localhost:8000 WebSocket and Simulated Mode"
             className={cn(
-              "group inline-flex items-center gap-2 rounded-full border px-3 py-1.5 font-mono text-[11px] font-medium transition",
+              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-medium transition",
               preferMockMode
-                ? "border-amber-500/35 bg-amber-500/10 text-amber-200 hover:bg-amber-500/15"
+                ? "border-black/[0.1] bg-[#F5F5F7] text-[#1D1D1F] hover:bg-black/[0.06]"
                 : isLive
-                  ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/15"
-                  : "border-cyan-500/35 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/15"
+                  ? "border-[#248A3D]/25 bg-[#248A3D]/[0.08] text-[#1D6F31] hover:bg-[#248A3D]/[0.12]"
+                  : "border-black/[0.08] bg-[#F5F5F7] text-[#1D1D1F] hover:bg-black/[0.06]"
             )}
           >
             {preferMockMode ? (
-              <WifiOff className="h-3.5 w-3.5 text-amber-400" />
+              <WifiOff className="h-3.5 w-3.5 text-[#6E6E73]" />
             ) : (
               <Wifi
                 className={cn(
                   "h-3.5 w-3.5",
-                  isLive ? "text-emerald-400" : "text-cyan-400"
+                  isLive ? "text-[#248A3D]" : "text-[#0071E3]"
                 )}
               />
             )}
             <span>
               {preferMockMode
-                ? "Mock Mode: ON"
+                ? "Simulated Mode"
                 : isLive
                   ? "Live API Connected"
-                  : "Live API · Auto Fallback"}
+                  : "Live API · Auto"}
             </span>
           </button>
 
@@ -142,19 +135,19 @@ export function TopNav({
               <button
                 type="button"
                 onClick={onExportJson}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.1] bg-[#121216] px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:border-white/25 hover:bg-[#18181F] hover:text-white"
+                className="inline-flex items-center gap-1.5 rounded-full border border-[#D2D2D7] bg-white px-3.5 py-1.5 text-[12px] font-medium text-[#1D1D1F] transition hover:border-[#86868B] hover:bg-[#F5F5F7]"
               >
-                <FileJson className="h-3.5 w-3.5 text-cyan-400" />
-                <span>.JSON</span>
+                <FileJson className="h-3.5 w-3.5 text-[#6E6E73]" />
+                <span>JSON</span>
               </button>
               <button
                 type="button"
                 onClick={onExportZip}
                 disabled={isExportingZip}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-violet-500/40 bg-violet-500/15 px-3 py-1.5 text-xs font-semibold text-violet-100 transition hover:bg-violet-500/25 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-full bg-[#0071E3] px-4 py-1.5 text-[12px] font-medium text-white transition hover:bg-[#0077ED] disabled:opacity-50"
               >
-                <Download className="h-3.5 w-3.5 text-violet-300" />
-                <span>{isExportingZip ? "Packing..." : "Export Kit .ZIP"}</span>
+                <Download className="h-3.5 w-3.5" />
+                <span>{isExportingZip ? "Exporting…" : "Export Kit"}</span>
               </button>
             </div>
           )}

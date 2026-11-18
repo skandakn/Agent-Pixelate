@@ -9,36 +9,49 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        obsidian: {
-          bg: "#09090B",
-          card: "#121216",
-          elevated: "#18181F",
-          border: "rgba(255, 255, 255, 0.08)",
-        },
-        violet: {
-          electric: "#8B5CF6",
-        },
-        cyan: {
-          signal: "#06B6D4",
+        apple: {
+          bg: "#F5F5F7",
+          surface: "#FFFFFF",
+          subtle: "#FBFBFD",
+          ink: "#1D1D1F",
+          secondary: "#6E6E73",
+          tertiary: "#86868B",
+          border: "#D2D2D7",
+          blue: "#0071E3",
+          "blue-hover": "#0077ED",
+          link: "#0066CC",
+          green: "#248A3D",
         },
       },
       fontFamily: {
-        sans: ["'Plus Jakarta Sans'", "system-ui", "sans-serif"],
-        mono: ["'JetBrains Mono'", "ui-monospace", "monospace"],
-      },
-      backgroundImage: {
-        "obsidian-grid":
-          "radial-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px)",
-        "studio-glow":
-          "radial-gradient(ellipse 65% 45% at 50% -10%, rgba(139, 92, 246, 0.16), transparent 70%), radial-gradient(ellipse 45% 35% at 85% 15%, rgba(6, 182, 212, 0.10), transparent 70%)",
-      },
-      backgroundSize: {
-        "grid-24": "24px 24px",
+        sans: [
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "'SF Pro Display'",
+          "'SF Pro Text'",
+          "'Plus Jakarta Sans'",
+          "'Helvetica Neue'",
+          "Arial",
+          "sans-serif",
+        ],
+        mono: [
+          "'SF Mono'",
+          "'JetBrains Mono'",
+          "ui-monospace",
+          "SFMono-Regular",
+          "Menlo",
+          "monospace",
+        ],
       },
       boxShadow: {
-        studio: "0 0 0 1px rgba(255, 255, 255, 0.08), 0 20px 50px -24px rgba(0, 0, 0, 0.9)",
-        "violet-glow": "0 0 28px -6px rgba(139, 92, 246, 0.55)",
-        "cyan-glow": "0 0 24px -6px rgba(6, 182, 212, 0.5)",
+        apple:
+          "0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px -12px rgba(0, 0, 0, 0.08)",
+        "apple-hover":
+          "0 4px 12px rgba(0, 0, 0, 0.05), 0 18px 36px -16px rgba(0, 0, 0, 0.12)",
+        "apple-pill": "0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 1px rgba(0, 0, 0, 0.04)",
+      },
+      borderRadius: {
+        "apple-card": "20px",
       },
       animation: {
         "pulse-slow": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
