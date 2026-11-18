@@ -141,8 +141,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "storage_dir": str(store.base_dir),
             "band": band.status_summary(),
             "agents_service_configured": bool(cfg.agents_service_url),
+            "gemini_configured": bool(cfg.gemini_api_key),
+            "clerk_configured": bool(os.environ.get("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY")),
             "sandbox_runtime": os.environ.get("AGENT37_RUNTIME", "standard"),
             "timestamp": utc_now().isoformat(),
+        }
+
+    @app.get("/api/config", tags=["system"])
+    async def public_runtime_config() -> dict[str, Any]:
+        """Expose non-secret public runtime configuration (e.g., Clerk publishable key)."""
+        return {
+            "clerk_publishable_key": os.environ.get("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", ""),
+            "gemini_enabled": bool(cfg.gemini_api_key),
+            "band_transport": band.active_transport,
         }
 
     @app.post(
