@@ -1,5 +1,5 @@
-import { CampaignWorkspace } from "@/components/CampaignWorkspace";
+import { ThreeDLandingGate } from "@/components/ThreeDLandingGate";
 
 export default function HomePage() {
-  return <CampaignWorkspace />;
+  return <ThreeDLandingGate />;
 }

@@ -27,6 +27,7 @@ class AgentHandle(str, Enum):
     ORCHESTRATOR = "@orchestrator_pixelate"
     VISUAL = "@visual_pixelate"
     COPY = "@copy_pixelate"
+    CRITIC = "@critic_pixelate"
 
 
 class CampaignStatus(str, Enum):
@@ -57,6 +58,10 @@ class EventType(str, Enum):
     APPROVAL_REQUIRED = "approval_required"
     APPROVAL_GRANTED = "approval_granted"
     AGENT_REVISION = "agent_revision"
+    CRITIC_REVIEW = "critic_review"
+    EXECUTION_TRACE = "execution_trace"
+    POLICY_BLOCKED = "policy_blocked"
+    AGENT_INVITED = "agent_invited"
     VISUAL_COMPLETED = "visual_completed"
     COPY_COMPLETED = "copy_completed"
     CAMPAIGN_COMPLETED = "campaign_completed"
@@ -386,19 +391,195 @@ class BandApprovalInput(BaseModel):
     note: str | None = Field(default=None, max_length=1500)
 
 
+class BandToolCallTrace(BaseModel):
+    """Auditable tool invocation inside a context-isolated BAND execution."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tool_name: str
+    framework: str = "AdaL / AdalFlow"
+    args_summary: str = ""
+    result_summary: str = ""
+    duration_ms: int = Field(default=0, ge=0)
+    status: Literal["ok", "error", "blocked"] = "ok"
+
+
+class BandTaskExecution(BaseModel):
+    """Context-isolated BAND agent execution record with tool trace & focus slice."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    execution_id: str = Field(default_factory=lambda: f"exec_{uuid4().hex[:10]}")
+    campaign_id: str
+    room_id: str
+    agent_handle: str
+    framework: str
+    trigger_by: str
+    trigger_reason: str
+    focus_memory_ids: list[str] = Field(default_factory=list)
+    focus_token_estimate: int = Field(default=0, ge=0)
+    tool_calls: list[BandToolCallTrace] = Field(default_factory=list)
+    status: Literal["queued", "running", "completed", "blocked_by_policy", "failed"] = "running"
+    duration_ms: int = Field(default=0, ge=0)
+    started_at: datetime = Field(default_factory=utc_now)
+    completed_at: datetime | None = None
+
+
+class BandFocusWindow(BaseModel):
+    """Per-Agent Focus projection computed by the BAND Control Plane.
+
+    Demonstrates BAND's context-isolation guarantee: each agent sees only the
+    room messages, memories, and peers relevant to its turn.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    agent_handle: str
+    total_room_events: int = 0
+    focused_event_count: int = 0
+    filtered_noise_count: int = 0
+    included_memory_keys: list[str] = Field(default_factory=list)
+    included_memory_ids: list[str] = Field(default_factory=list)
+    focused_tokens_est: int = 0
+    full_room_tokens_est: int = 0
+    context_savings_pct: float = 0.0
+    focus_summary: str = ""
+
+
+class BandPolicyAuthority(BaseModel):
+    """Dual-scope authority boundary for a participant in the BAND Control Plane."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    handle: str
+    api_scope: Literal["human_me_api", "agent_runtime_api"]
+    can_read_memories: bool = True
+    can_write_memories: bool = True
+    can_promote_brand_memory: bool = False
+    can_approve_handoff: bool = False
+    can_modify_governance: bool = False
+    can_mention: list[str] = Field(default_factory=list)
+    allowed_tools: list[str] = Field(default_factory=list)
+    muted: bool = False
+
+
+class BandLoopGuardState(BaseModel):
+    """BAND Loop-Prevention Circuit Breaker telemetry for a room."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    max_agent_hops: int = Field(default=6, ge=1, le=20)
+    current_hops: int = Field(default=0, ge=0)
+    blocked_loops: int = Field(default=0, ge=0)
+    strict_mode: bool = True
+    circuit_open: bool = False
+    last_route: str = ""
+
+
+class BandCriticCheck(BaseModel):
+    """Single automated audit check from `@critic_pixelate`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    category: Literal["contrast_wcag", "palette_harmony", "copy_conversion", "platform_spec", "guardrails"]
+    label: str
+    passed: bool
+    score: int = Field(ge=0, le=100)
+    detail: str
+
+
+class BandCriticReport(BaseModel):
+    """Structured Brand QA & Governance Scorecard emitted by `@critic_pixelate`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    report_id: str = Field(default_factory=lambda: f"qa_{uuid4().hex[:8]}")
+    overall_score: int = Field(ge=0, le=100)
+    grade: str
+    summary: str
+    wcag_contrast_ratio: float = 0.0
+    checks: list[BandCriticCheck] = Field(default_factory=list)
+    recommended_mention: str | None = None
+    generated_at: datetime = Field(default_factory=utc_now)
+
+
+class BandAuditEntry(BaseModel):
+    """Tamper-evident SHA-256 hash-chained audit record for BAND compliance export."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    seq: int
+    timestamp: datetime
+    actor: str
+    api_scope: Literal["human_me_api", "agent_runtime_api"]
+    action: str
+    target: str = ""
+    summary: str
+    prev_hash: str
+    entry_hash: str
+
+
+class BandAgentDirectoryEntry(BaseModel):
+    """Discoverable agent in the BAND Agentic Mesh Registry."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    handle: str
+    display_name: str
+    framework: str
+    agent_type: Literal["remote_sdk", "platform_hosted", "human_proxy"] = "remote_sdk"
+    contact_status: Literal["mutual_approved", "pending", "system"] = "mutual_approved"
+    description: str
+    skills: list[str] = Field(default_factory=list)
+    capabilities: list[str] = Field(default_factory=list)
+    registered_remote: bool = False
+
+
+class BandGovernancePatch(BaseModel):
+    """Runtime governance policy update submitted via the Human `/me` Control Plane."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    actor: str = Field(default=AgentHandle.HUMAN.value)
+    require_handoff_approval: bool | None = None
+    auto_critic_qa: bool | None = None
+    strict_loop_guard: bool | None = None
+    max_agent_hops: int | None = Field(default=None, ge=1, le=20)
+    mute_handle: str | None = None
+    muted: bool | None = None
+
+
+class BandPromoteMemoryInput(BaseModel):
+    """Promote a campaign room memory to Cross-Session Brand Memory."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    memory_id: str = Field(..., min_length=1)
+    promoter: str = Field(default=AgentHandle.HUMAN.value)
+
+
 class BandRoomSnapshot(BaseModel):
-    """Full live collaboration state of a campaign's BAND room."""
+    """Full live collaboration & Control Plane state of a campaign's BAND room."""
 
     model_config = ConfigDict(extra="forbid")
 
     campaign_id: str
     room_id: str
+    brand_name: str = ""
     transport: Literal["band", "local_fallback"] = "local_fallback"
     status: CampaignStatus
     approval_required: bool = False
     pending_approval: bool = False
+    auto_critic_qa: bool = True
     participants: list[BandParticipant] = Field(default_factory=list)
     memories: list[BandMemoryEntry] = Field(default_factory=list)
+    brand_memories: list[BandMemoryEntry] = Field(default_factory=list)
     messages: list[AgentEvent] = Field(default_factory=list)
     delegations: list[BandDelegationEdge] = Field(default_factory=list)
+    executions: list[BandTaskExecution] = Field(default_factory=list)
+    focus_windows: list[BandFocusWindow] = Field(default_factory=list)
+    policies: list[BandPolicyAuthority] = Field(default_factory=list)
+    loop_guard: BandLoopGuardState = Field(default_factory=BandLoopGuardState)
+    critic_report: BandCriticReport | None = None
+    audit_chain_head: str = ""
     updated_at: datetime = Field(default_factory=utc_now)
