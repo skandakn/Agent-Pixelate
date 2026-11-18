@@ -108,14 +108,49 @@ export async function exportCampaignZip(assets: CampaignAssets): Promise<void> {
 
   const creativesFolder = root.folder("creatives");
   if (creativesFolder) {
-    assets.creatives.forEach((creative, idx) => {
+    for (let idx = 0; idx < assets.creatives.length; idx += 1) {
+      const creative = assets.creatives[idx];
       if (creative.svgMarkup) {
         creativesFolder.file(
           `0${idx + 1}-${slugify(creative.title)}.svg`,
           creative.svgMarkup
         );
+      } else if (creative.imageUrl && creative.imageUrl.startsWith("http")) {
+        try {
+          const resp = await fetch(creative.imageUrl);
+          if (resp.ok) {
+            const bytes = await resp.arrayBuffer();
+            creativesFolder.file(
+              `0${idx + 1}-${slugify(creative.title)}.svg`,
+              bytes
+            );
+          }
+        } catch {
+          // Skip remote asset if offline
+        }
       }
-    });
+    }
+  }
+
+  if (assets.videos && assets.videos.length > 0) {
+    const videosFolder = root.folder("videos");
+    if (videosFolder) {
+      for (let idx = 0; idx < assets.videos.length; idx += 1) {
+        const video = assets.videos[idx];
+        try {
+          const resp = await fetch(video.videoUrl);
+          if (resp.ok) {
+            const bytes = await resp.arrayBuffer();
+            videosFolder.file(
+              `0${idx + 1}-${slugify(video.title)}.mp4`,
+              bytes
+            );
+          }
+        } catch {
+          // Skip if video cannot be fetched
+        }
+      }
+    }
   }
 
   const blob = await zip.generateAsync({ type: "blob" });

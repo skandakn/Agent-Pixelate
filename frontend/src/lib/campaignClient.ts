@@ -3,12 +3,15 @@ import {
   AgentSender,
   CampaignAssets,
   CampaignBrief,
+  CampaignVideoAsset,
   ColorSwatch,
   ContextHandoffPayload,
   MetaAdVariant,
   PipelineStage,
   Platform,
   SocialPost,
+  VideoAspectRatio,
+  VideoShotStyle,
   VisualCreative,
 } from "@/types/campaign";
 import { buildSimulatedCampaignAssets } from "@/data/presets";
@@ -70,6 +73,7 @@ interface BackendVisualAsset {
   aspect_ratio?: string;
   prompt_used?: string;
   asset_url: string;
+  mime_type?: string;
   color_tokens?: string[];
   alt_text?: string;
 }
@@ -230,9 +234,43 @@ function adaptBackendCampaignToAssets(
     role: swatchRoles[idx] ?? "Brand Accent",
   }));
 
+  const rawAssets = visual?.assets ?? [];
+  const rawImageAssets = rawAssets.filter(
+    (a) =>
+      !(a.mime_type?.startsWith("video/") || a.asset_url.toLowerCase().endsWith(".mp4"))
+  );
+  const rawVideoAssets = rawAssets.filter(
+    (a) =>
+      a.mime_type?.startsWith("video/") || a.asset_url.toLowerCase().endsWith(".mp4")
+  );
+
+  const videos: CampaignVideoAsset[] = rawVideoAssets.map((asset, idx) => {
+    const resolvedUrl = asset.asset_url.startsWith("http")
+      ? asset.asset_url
+      : `${apiBase}${asset.asset_url.startsWith("/") ? "" : "/"}${asset.asset_url}`;
+    const ar: VideoAspectRatio = asset.aspect_ratio === "9:16" ? "9:16" : "16:9";
+    const idLower = `${asset.asset_id} ${asset.title}`.toLowerCase();
+    const style: VideoShotStyle = idLower.includes("kinetic")
+      ? "kinetic_type"
+      : idLower.includes("luxury")
+        ? "luxury_editorial"
+        : idLower.includes("pulse")
+          ? "pulse_drop"
+          : "obsidian_cinema";
+    return {
+      id: asset.asset_id || `${backend.campaign_id}-vid-${idx + 1}`,
+      title: asset.title,
+      videoUrl: resolvedUrl,
+      aspectRatio: ar,
+      shotStyle: style,
+      durationSec: 10,
+      promptSummary: asset.prompt_used || "Cinematic H.264 promo render",
+    };
+  });
+
   const creatives: VisualCreative[] =
-    visual?.assets && visual.assets.length > 0
-      ? visual.assets.map((asset, idx) => {
+    rawImageAssets.length > 0
+      ? rawImageAssets.map((asset, idx) => {
           const resolvedUrl = asset.asset_url.startsWith("http")
             ? asset.asset_url
             : `${apiBase}${asset.asset_url.startsWith("/") ? "" : "/"}${asset.asset_url}`;
@@ -249,10 +287,13 @@ function adaptBackendCampaignToAssets(
               fallback.creatives[idx % fallback.creatives.length]?.lighting ??
               "Studio dual-axis rim lighting",
             composition:
-              visual.typography_direction ||
+              visual?.typography_direction ||
               "Balanced modular editorial layout with crisp negative space",
-            artNote: visual.creative_direction,
-            promptSummary: asset.prompt_used || visual.creative_direction,
+            artNote: visual?.creative_direction || fallback.artDirectionSummary,
+            promptSummary:
+              asset.prompt_used ||
+              visual?.creative_direction ||
+              fallback.artDirectionSummary,
           };
         })
       : fallback.creatives;
@@ -340,6 +381,7 @@ function adaptBackendCampaignToAssets(
       visual?.creative_direction || fallback.artDirectionSummary,
     palette,
     creatives,
+    videos,
     storyboard: fallback.storyboard.map((frame, i) => ({
       ...frame,
       accentHex: paletteHexes[1] ?? frame.accentHex,
@@ -565,6 +607,7 @@ export function launchCampaignSession(
           artDirectionSummary: adapted.artDirectionSummary,
           palette: adapted.palette,
           creatives: adapted.creatives,
+          videos: adapted.videos,
           storyboard: adapted.storyboard,
           handoff: adapted.handoff,
         });
@@ -793,5 +836,41 @@ export function launchCampaignSession(
         fallbackController.cancel();
       }
     },
+  };
+}
+
+export async function requestCustomVideoCut(
+  campaignId: string,
+  aspectRatio: VideoAspectRatio,
+  shotStyle: VideoShotStyle
+): Promise<CampaignVideoAsset> {
+  const { apiBase } = resolveBackendEndpoints();
+  const res = await fetch(`${apiBase}/api/campaigns/${campaignId}/video`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      aspect_ratio: aspectRatio,
+      shot_style: shotStyle,
+    }),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(`Video render failed (HTTP ${res.status}): ${detail}`);
+  }
+
+  const asset = (await res.json()) as BackendVisualAsset;
+  const resolvedUrl = asset.asset_url.startsWith("http")
+    ? asset.asset_url
+    : `${apiBase}${asset.asset_url.startsWith("/") ? "" : "/"}${asset.asset_url}`;
+
+  return {
+    id: asset.asset_id,
+    title: asset.title,
+    videoUrl: resolvedUrl,
+    aspectRatio: asset.aspect_ratio === "9:16" ? "9:16" : "16:9",
+    shotStyle,
+    durationSec: 10,
+    promptSummary: asset.prompt_used || "Cinematic H.264 MP4 render",
   };
 }
