@@ -13,7 +13,9 @@ Drives the Agent Pixelate pipeline:
 from __future__ import annotations
 
 import asyncio
+import base64
 import html
+import json
 import logging
 import os
 import shutil
@@ -528,12 +530,120 @@ class CampaignCoordinator:
             trigger_mentions=False,
         )
 
+    async def _gemini_generate_json(self, prompt: str) -> dict[str, Any] | None:
+        """Call Gemini REST API for structured JSON output when `GEMINI_API_KEY` is configured."""
+        api_key = self.settings.gemini_api_key
+        if not api_key or os.environ.get("PYTEST_CURRENT_TEST") or self._http is None:
+            return None
+
+        model = os.environ.get("GEMINI_TEXT_MODEL", "gemini-3.5-flash-lite")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        try:
+            resp = await self._http.post(
+                url,
+                params={"key": api_key},
+                json={
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {
+                        "temperature": 0.65,
+                        "responseMimeType": "application/json",
+                    },
+                },
+                timeout=30.0,
+            )
+            if resp.status_code >= 400:
+                logger.warning("Gemini JSON call (%s) HTTP %s: %s", model, resp.status_code, resp.text[:200])
+                return None
+            data = resp.json()
+            parts = (
+                data.get("candidates", [{}])[0]
+                .get("content", {})
+                .get("parts", [])
+            )
+            text = "".join(str(p.get("text", "")) for p in parts if isinstance(p, dict)).strip()
+            if text.startswith("```"):
+                text = text.strip("`")
+                if text.startswith("json"):
+                    text = text[4:].strip()
+            parsed = json.loads(text)
+            return parsed if isinstance(parsed, dict) else None
+        except Exception as exc:
+            logger.warning("Gemini JSON generation failed (%s); falling back cleanly.", exc)
+            return None
+
+    async def _gemini_generate_image(self, prompt: str) -> tuple[bytes, str] | None:
+        """Generate a real campaign visual via Gemini Flash Image when `GEMINI_API_KEY` is configured."""
+        api_key = self.settings.gemini_api_key
+        if not api_key or os.environ.get("PYTEST_CURRENT_TEST") or self._http is None:
+            return None
+
+        model = os.environ.get("GEMINI_IMAGE_MODEL", "gemini-3.1-flash-lite-image")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        try:
+            resp = await self._http.post(
+                url,
+                params={"key": api_key},
+                json={
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {"responseModalities": ["IMAGE"]},
+                },
+                timeout=40.0,
+            )
+            if resp.status_code >= 400:
+                logger.warning("Gemini image call (%s) HTTP %s", model, resp.status_code)
+                return None
+            data = resp.json()
+            parts = (
+                data.get("candidates", [{}])[0]
+                .get("content", {})
+                .get("parts", [])
+            )
+            for part in parts:
+                inline = part.get("inlineData") or part.get("inline_data")
+                if isinstance(inline, dict) and inline.get("data"):
+                    raw_bytes = base64.b64decode(inline["data"])
+                    mime = str(inline.get("mimeType") or inline.get("mime_type") or "image/png")
+                    return raw_bytes, mime
+        except Exception as exc:
+            logger.warning("Gemini image generation failed (%s); using studio SVG.", exc)
+        return None
+
     async def _synthesize_fallback_visual(
         self, campaign: CampaignResponse
     ) -> VisualOutput:
-        """Generate real SVG visual concept assets into `/data/campaigns` when `/agents` is offline."""
+        """Generate Gemini-powered visual concepts & assets (with studio SVG fallback)."""
         req = campaign.request
-        palette = req.color_palette if len(req.color_palette) >= 2 else DEFAULT_PALETTE
+        gemini_plan = await self._gemini_generate_json(
+            (
+                "You are @visual_pixelate, an elite creative director. Return ONLY valid JSON with keys: "
+                '"creative_direction" (string, 2 crisp sentences), '
+                '"mood_keywords" (array of 4 short adjectives), '
+                '"color_palette" (array of 5 hex strings starting with #), '
+                '"typography_direction" (string), '
+                f'"concepts" (array of exactly {req.num_concepts} objects each with "title", "style_notes", and "image_prompt").\n'
+                f"Brand: {req.brand_name}\n"
+                f"Product: {req.product_description}\n"
+                f"Target Audience: {req.target_audience}\n"
+                f"Goal: {req.campaign_goal}\n"
+                f"Brand Tone: {req.brand_tone}\n"
+                f"Platforms: {', '.join(req.platforms)}\n"
+                f"Preferred Palette: {', '.join(req.color_palette) if req.color_palette else 'Choose a cohesive 5-hex palette'}"
+            )
+        )
+
+        raw_palette = (
+            gemini_plan.get("color_palette")
+            if gemini_plan and isinstance(gemini_plan.get("color_palette"), list)
+            else None
+        )
+        valid_gemini_palette = [
+            str(c) for c in (raw_palette or []) if isinstance(c, str) and c.startswith("#")
+        ]
+        palette = (
+            req.color_palette
+            if len(req.color_palette) >= 2
+            else (valid_gemini_palette if len(valid_gemini_palette) >= 3 else DEFAULT_PALETTE)
+        )
         primary = palette[0]
         accent = palette[1]
         highlight = palette[2] if len(palette) > 2 else "#22D3EE"
@@ -547,46 +657,68 @@ class CampaignCoordinator:
             ("Limited Drop Teaser", "Atmospheric gradient aura with crisp callout badge"),
             ("Conversion Banner", "Balanced negative space drawing eyes to CTA lockup"),
         ]
+        gemini_concepts = (
+            gemini_plan.get("concepts")
+            if gemini_plan and isinstance(gemini_plan.get("concepts"), list)
+            else []
+        )
 
         selected_platforms = req.platforms
-        pace_delay = 0.0 if os.environ.get("PYTEST_CURRENT_TEST") else 0.35
+        pace_delay = 0.0 if os.environ.get("PYTEST_CURRENT_TEST") else 0.25
         for idx in range(req.num_concepts):
-            if pace_delay:
+            if pace_delay and not gemini_plan:
                 await asyncio.sleep(pace_delay)
             platform = selected_platforms[idx % len(selected_platforms)]
             aspect, width, height = PLATFORM_ASPECT_RATIOS.get(platform, ("1:1", 900, 580))
-            angle_title, angle_style = concept_angles[idx % len(concept_angles)]
+            fallback_title, fallback_style = concept_angles[idx % len(concept_angles)]
+            c_item = gemini_concepts[idx] if idx < len(gemini_concepts) and isinstance(gemini_concepts[idx], dict) else {}
+            angle_title = str(c_item.get("title") or fallback_title)[:120]
+            prompt_used = str(
+                c_item.get("image_prompt")
+                or (
+                    f"{req.brand_tone} marketing visual for {req.brand_name}: "
+                    f"{req.product_description}. Style: {c_item.get('style_notes') or fallback_style}. "
+                    f"Palette: {', '.join(palette)}. Ultra-clean commercial studio photography, no garbled text."
+                )
+            )[:3800]
             asset_id = f"asset_{idx + 1}_{uuid4().hex[:6]}"
-            filename = f"{asset_id}_{platform}.svg"
 
-            svg_content = self._render_concept_svg(
-                brand_name=req.brand_name,
-                concept_title=angle_title,
-                platform=platform,
-                tone=req.brand_tone,
-                primary=primary,
-                accent=accent,
-                highlight=highlight,
-                width=width,
-                height=height,
-            )
-            saved_path = await self.store.write_asset_bytes(
-                campaign.campaign_id, filename, svg_content.encode("utf-8")
-            )
+            # Try real Gemini Flash Image generation first when GEMINI_API_KEY is active
+            img_result = await self._gemini_generate_image(prompt_used)
+            if img_result is not None:
+                img_bytes, mime_type = img_result
+                ext = "jpg" if "jpeg" in mime_type or "jpg" in mime_type else "png"
+                filename = f"{asset_id}_{platform}.{ext}"
+                saved_path = await self.store.write_asset_bytes(
+                    campaign.campaign_id, filename, img_bytes
+                )
+            else:
+                filename = f"{asset_id}_{platform}.svg"
+                mime_type = "image/svg+xml"
+                svg_content = self._render_concept_svg(
+                    brand_name=req.brand_name,
+                    concept_title=angle_title,
+                    platform=platform,
+                    tone=req.brand_tone,
+                    primary=primary,
+                    accent=accent,
+                    highlight=highlight,
+                    width=width,
+                    height=height,
+                )
+                saved_path = await self.store.write_asset_bytes(
+                    campaign.campaign_id, filename, svg_content.encode("utf-8")
+                )
 
             asset = VisualAsset(
                 asset_id=asset_id,
                 title=f"{req.brand_name} — {angle_title}",
                 platform=platform,
                 aspect_ratio=aspect,
-                prompt_used=(
-                    f"{req.brand_tone} marketing visual for {req.brand_name}: "
-                    f"{req.product_description}. Style: {angle_style}. "
-                    f"Palette: {', '.join(palette)}."
-                ),
+                prompt_used=prompt_used,
                 file_path=str(saved_path),
                 asset_url=f"/api/campaigns/{campaign.campaign_id}/assets/{filename}",
-                mime_type="image/svg+xml",
+                mime_type=mime_type,
                 width=width,
                 height=height,
                 color_tokens=palette,
@@ -599,7 +731,10 @@ class CampaignCoordinator:
                 room_id=campaign.room_id,
                 sender=AgentHandle.VISUAL.value,
                 event_type=EventType.ASSET_GENERATED,
-                message=f"Generated visual concept {idx + 1}/{req.num_concepts}: {asset.title} ({platform}).",
+                message=(
+                    f"Generated {'Gemini AI' if img_result else 'studio'} visual concept "
+                    f"{idx + 1}/{req.num_concepts}: {asset.title} ({platform})."
+                ),
                 payload={"asset": asset.model_dump(mode="json")},
                 trigger_mentions=False,
             )
@@ -640,16 +775,27 @@ class CampaignCoordinator:
                     exc,
                 )
 
-        mood_keywords = [
+        mood_keywords = (
+            [str(k) for k in gemini_plan.get("mood_keywords", []) if str(k).strip()][:6]
+            if gemini_plan and isinstance(gemini_plan.get("mood_keywords"), list)
+            else []
+        ) or [
             kw.strip()
             for kw in req.brand_tone.replace(" and ", ",").split(",")
             if kw.strip()
         ] or ["modern", "vibrant", "high-contrast"]
 
-        creative_direction = (
-            f"A {req.brand_tone.lower()} visual system for {req.brand_name} built around "
-            f"high-contrast geometric framing, tactile product focus, and unmistakable "
-            f"color blocking tailored to {req.target_audience}."
+        creative_direction = str(
+            (gemini_plan or {}).get("creative_direction")
+            or (
+                f"A {req.brand_tone.lower()} visual system for {req.brand_name} built around "
+                f"high-contrast geometric framing, tactile product focus, and unmistakable "
+                f"color blocking tailored to {req.target_audience}."
+            )
+        )
+        typography_direction = str(
+            (gemini_plan or {}).get("typography_direction")
+            or "Bold geometric display sans + clean grotesk body"
         )
         asset_bullets = "\n".join(
             f"- **{a.title}** (`{a.platform}`, `{a.aspect_ratio}`): {a.asset_url}"
@@ -660,7 +806,7 @@ class CampaignCoordinator:
             f"- **Creative Direction:** {creative_direction}\n"
             f"- **Palette:** {', '.join(palette)}\n"
             f"- **Mood:** {', '.join(mood_keywords)}\n"
-            f"- **Typography:** Geometric sans-serif display headlines paired with crisp editorial body.\n"
+            f"- **Typography:** {typography_direction}\n"
             f"- **Generated Assets:**\n{asset_bullets}"
         )
 
@@ -669,7 +815,7 @@ class CampaignCoordinator:
             creative_direction=creative_direction,
             mood_keywords=mood_keywords,
             color_palette=palette,
-            typography_direction="Bold geometric display sans + clean grotesk body",
+            typography_direction=typography_direction,
             visual_brief_markdown=visual_brief_md,
             assets=assets,
         )
@@ -677,11 +823,86 @@ class CampaignCoordinator:
     async def _synthesize_fallback_copy(
         self, campaign: CampaignResponse, memories: list[BandMemoryEntry]
     ) -> CopyOutput:
-        """Synthesize cohesive multi-platform copy aligned to VisualOutput when `/agents` is offline."""
+        """Synthesize Gemini-powered multi-platform copy aligned to VisualOutput & Band Memories."""
         req = campaign.request
         visual = campaign.visual_output
         assets = visual.assets if visual else []
         brand_slug = "".join(ch for ch in req.brand_name if ch.isalnum())
+
+        memory_context = "\n\n".join(f"[{m.key} by {m.author}]\n{m.content}" for m in memories)
+        gemini_copy = await self._gemini_generate_json(
+            (
+                "You are @copy_pixelate, an elite conversion copywriter collaborating in a BAND room. "
+                "Return ONLY valid JSON with keys: "
+                '"campaign_tagline" (string, punchy <120 chars), '
+                '"brand_voice_summary" (string), '
+                '"key_messages" (array of 3 concise strings), '
+                '"email_subject_lines" (array of 3 high-open-rate subject lines), '
+                f'"platform_copies" (array with one entry per platform in {json.dumps(req.platforms)}, each having '
+                '"platform", "headline", "subheadline", "body_copy", "call_to_action", "hashtags" [array of 3-5 #tags]).\n\n'
+                f"Brand: {req.brand_name}\nProduct: {req.product_description}\n"
+                f"Target Audience: {req.target_audience}\nGoal: {req.campaign_goal}\nTone: {req.brand_tone}\n\n"
+                f"Shared Band Memories from @visual_pixelate:\n{memory_context}"
+            )
+        )
+
+        if gemini_copy and isinstance(gemini_copy.get("platform_copies"), list) and gemini_copy["platform_copies"]:
+            parsed_copies: list[PlatformCopy] = []
+            by_platform = {
+                str(item.get("platform", "")).strip().lower(): item
+                for item in gemini_copy["platform_copies"]
+                if isinstance(item, dict)
+            }
+            for idx, platform in enumerate(req.platforms):
+                linked = assets[idx % len(assets)] if assets else None
+                item = by_platform.get(platform) or (
+                    gemini_copy["platform_copies"][idx]
+                    if idx < len(gemini_copy["platform_copies"])
+                    and isinstance(gemini_copy["platform_copies"][idx], dict)
+                    else {}
+                )
+                headline = str(item.get("headline") or f"Meet {req.brand_name}")[:230]
+                body = str(item.get("body_copy") or req.product_description)[:3900]
+                cta = str(item.get("call_to_action") or "Explore Now")[:150]
+                sub = str(item.get("subheadline") or req.campaign_goal)[:390]
+                raw_tags = item.get("hashtags") if isinstance(item.get("hashtags"), list) else []
+                hashtags = [
+                    t if str(t).startswith("#") else f"#{t}"
+                    for t in raw_tags
+                    if str(t).strip()
+                ] or [f"#{brand_slug}", "#AgentPixelate", f"#{platform}"]
+                parsed_copies.append(
+                    PlatformCopy(
+                        platform=platform,
+                        headline=headline,
+                        subheadline=sub,
+                        body_copy=body,
+                        call_to_action=cta,
+                        hashtags=hashtags,
+                        linked_asset_id=linked.asset_id if linked else None,
+                    )
+                )
+
+            return CopyOutput(
+                campaign_id=campaign.campaign_id,
+                campaign_tagline=str(
+                    gemini_copy.get("campaign_tagline") or f"{req.brand_name}: Built for impact."
+                )[:290],
+                brand_voice_summary=str(
+                    gemini_copy.get("brand_voice_summary")
+                    or f"{req.brand_tone} voice tailored to {req.target_audience}."
+                )[:980],
+                key_messages=[
+                    str(m) for m in gemini_copy.get("key_messages", []) if str(m).strip()
+                ][:5]
+                or [req.product_description],
+                platform_copies=parsed_copies,
+                email_subject_lines=[
+                    str(s) for s in gemini_copy.get("email_subject_lines", []) if str(s).strip()
+                ][:5]
+                or [f"Introducing {req.brand_name}"],
+                band_memory_refs=[m.memory_id for m in memories],
+            )
 
         platform_copies: list[PlatformCopy] = []
         pace_delay = 0.0 if os.environ.get("PYTEST_CURRENT_TEST") else 0.4

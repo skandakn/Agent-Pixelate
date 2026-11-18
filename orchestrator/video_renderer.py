@@ -714,8 +714,10 @@ def render_campaign_video_mp4(spec: VideoRenderSpec, output_path: Path) -> Path:
                     text_rgb=text_rgb,
                 )
                 proc.stdin.write(raw)
+            proc.stdin.flush()
         finally:
             proc.stdin.close()
+            proc.stdin = None
 
         _, stderr_bytes = proc.communicate(timeout=90)
         if proc.returncode != 0:

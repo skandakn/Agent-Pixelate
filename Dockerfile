@@ -7,6 +7,9 @@ FROM node:20-alpine AS frontend-builder
 
 WORKDIR /frontend
 
+ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=""
+ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 
