@@ -18,6 +18,7 @@ import html
 import json
 import logging
 import os
+import re
 import shutil
 from pathlib import Path
 from typing import Any
@@ -67,6 +68,40 @@ PLATFORM_ASPECT_RATIOS: dict[str, tuple[str, int, int]] = {
 }
 
 DEFAULT_PALETTE = ["#09090B", "#8B5CF6", "#06B6D4", "#272736", "#F8FAFC"]
+HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+
+
+def _normalize_palette_hexes(
+    user_hints: list[str] | None, gemini_hints: list[str] | None = None
+) -> list[str]:
+    """Validate and expand #RGB/#RRGGBB color tokens into a clean 5-hex palette."""
+    valid: list[str] = []
+    for source in (user_hints or [], gemini_hints or []):
+        for raw in source:
+            if not isinstance(raw, str):
+                continue
+            cleaned = raw.strip()
+            if not cleaned:
+                continue
+            if not cleaned.startswith("#"):
+                cleaned = f"#{cleaned}"
+            if len(cleaned) == 4 and all(c in "0123456789abcdefABCDEF" for c in cleaned[1:]):
+                cleaned = "#" + "".join(c * 2 for c in cleaned[1:])
+            if HEX_COLOR_RE.match(cleaned):
+                upper = cleaned.upper()
+                if upper not in valid:
+                    valid.append(upper)
+            if len(valid) >= 5:
+                break
+        if len(valid) >= 5:
+            break
+
+    for fallback in DEFAULT_PALETTE:
+        if len(valid) >= 5:
+            break
+        if fallback not in valid:
+            valid.append(fallback)
+    return valid[:5]
 
 
 class CampaignCoordinator:
@@ -85,6 +120,7 @@ class CampaignCoordinator:
         self.band = band
         self._background_tasks: set[asyncio.Task[None]] = set()
         self._http: httpx.AsyncClient | None = None
+        self._video_semaphore = asyncio.Semaphore(2)
 
         # Wire Band `@mention` routing directly to agent dispatchers
         self.band.register_mention_handler(
@@ -1398,14 +1434,7 @@ class CampaignCoordinator:
             if gemini_plan and isinstance(gemini_plan.get("color_palette"), list)
             else None
         )
-        valid_gemini_palette = [
-            str(c) for c in (raw_palette or []) if isinstance(c, str) and c.startswith("#")
-        ]
-        palette = (
-            req.color_palette
-            if len(req.color_palette) >= 2
-            else (valid_gemini_palette if len(valid_gemini_palette) >= 3 else DEFAULT_PALETTE)
-        )
+        palette = _normalize_palette_hexes(req.color_palette, raw_palette)
         primary = palette[0]
         accent = palette[1]
         highlight = palette[2] if len(palette) > 2 else "#22D3EE"
@@ -1501,41 +1530,33 @@ class CampaignCoordinator:
                 trigger_mentions=False,
             )
 
-        # Render cinematic H.264 MP4 promo video (inspired by motionmaxxing + bang-motion + video-shotcraft)
-        if shutil.which("ffmpeg") and not os.environ.get("PYTEST_CURRENT_TEST"):
-            try:
-                default_style: ShotStyle = (
-                    "luxury_editorial"
-                    if "lux" in req.brand_tone.lower()
-                    else "pulse_drop"
-                    if "bold" in req.brand_tone.lower()
-                    else "obsidian_cinema"
-                )
-                video_asset = await self._render_video_asset(
-                    campaign=campaign,
-                    palette=palette,
+        # Schedule optional cinematic H.264 MP4 promo video asynchronously (non-blocking)
+        # so multi-user visual/copy orchestration is never starved by CPU-bound FFmpeg renders.
+        auto_video_enabled = os.environ.get("AUTO_RENDER_VIDEO", "false").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+        if (
+            auto_video_enabled
+            and shutil.which("ffmpeg")
+            and not os.environ.get("PYTEST_CURRENT_TEST")
+        ):
+            default_style: ShotStyle = (
+                "luxury_editorial"
+                if "lux" in req.brand_tone.lower()
+                else "pulse_drop"
+                if "bold" in req.brand_tone.lower()
+                else "obsidian_cinema"
+            )
+            self._spawn(
+                self._render_background_promo_video(
+                    campaign_id=campaign.campaign_id,
                     aspect_ratio="16:9",
                     shot_style=default_style,
-                )
-                assets.append(video_asset)
-                await self.band.post_room_message(
-                    campaign_id=campaign.campaign_id,
-                    room_id=campaign.room_id,
-                    sender=AgentHandle.VISUAL.value,
-                    event_type=EventType.ASSET_GENERATED,
-                    message=(
-                        f"Rendered 10s cinematic H.264 promo video ({default_style}, 16:9) "
-                        f"with beat-synced soundtrack: {video_asset.title}."
-                    ),
-                    payload={"asset": video_asset.model_dump(mode="json")},
-                    trigger_mentions=False,
-                )
-            except Exception as exc:
-                logger.warning(
-                    "MP4 video rendering skipped for campaign %s: %s",
-                    campaign.campaign_id,
-                    exc,
-                )
+                ),
+                name=f"video-bg-{campaign.campaign_id}",
+            )
 
         mood_keywords = (
             [str(k) for k in gemini_plan.get("mood_keywords", []) if str(k).strip()][:6]
@@ -1589,7 +1610,7 @@ class CampaignCoordinator:
         req = campaign.request
         visual = campaign.visual_output
         assets = visual.assets if visual else []
-        brand_slug = "".join(ch for ch in req.brand_name if ch.isalnum())
+        brand_slug = "".join(ch for ch in req.brand_name if ch.isalnum()) or "AgentPixelate"
 
         memory_context = "\n\n".join(f"[{m.key} by {m.author}]\n{m.content}" for m in memories)
         gemini_copy = await self._gemini_generate_json(
@@ -1708,10 +1729,10 @@ class CampaignCoordinator:
             platform_copies.append(
                 PlatformCopy(
                     platform=platform,
-                    headline=headline,
-                    subheadline=f"{req.campaign_goal}",
-                    body_copy=body,
-                    call_to_action=cta,
+                    headline=headline[:235],
+                    subheadline=req.campaign_goal[:390],
+                    body_copy=body[:3900],
+                    call_to_action=cta[:155],
                     hashtags=[f"#{brand_slug}", "#AgentPixelate", f"#{platform}"],
                     linked_asset_id=linked.asset_id if linked else None,
                 )
@@ -1785,7 +1806,8 @@ class CampaignCoordinator:
             fps=18,
         )
 
-        await asyncio.to_thread(render_campaign_video_mp4, spec, out_path)
+        async with self._video_semaphore:
+            await asyncio.to_thread(render_campaign_video_mp4, spec, out_path)
 
         width, height = (450, 800) if aspect_ratio == "9:16" else (800, 450)
         return VisualAsset(
@@ -1805,6 +1827,27 @@ class CampaignCoordinator:
             color_tokens=palette,
             alt_text=f"10s H.264 cinematic promo video for {req.brand_name}",
         )
+
+    async def _render_background_promo_video(
+        self,
+        *,
+        campaign_id: str,
+        aspect_ratio: AspectRatio = "16:9",
+        shot_style: ShotStyle = "obsidian_cinema",
+    ) -> None:
+        """Non-blocking background MP4 enrichment bounded by `self._video_semaphore`."""
+        try:
+            await self.render_campaign_video(
+                campaign_id, aspect_ratio=aspect_ratio, shot_style=shot_style
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.warning(
+                "Background MP4 video rendering skipped for campaign %s: %s",
+                campaign_id,
+                exc,
+            )
 
     async def render_campaign_video(
         self,

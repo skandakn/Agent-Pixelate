@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import time
 from collections import defaultdict
 from pathlib import Path
 
@@ -56,9 +57,17 @@ class CampaignStore:
     @staticmethod
     def _atomic_write_json(path: Path, data: object) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_path = path.with_suffix(path.suffix + ".tmp")
+        tmp_path = path.with_suffix(f"{path.suffix}.{os.getpid()}.{time.monotonic_ns()}.tmp")
         tmp_path.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
-        os.replace(tmp_path, path)
+        for attempt in range(6):
+            try:
+                os.replace(tmp_path, path)
+                return
+            except PermissionError:
+                if attempt == 5:
+                    tmp_path.unlink(missing_ok=True)
+                    raise
+                time.sleep(0.02 * (attempt + 1))
 
     def _load_sync(self, campaign_id: str) -> CampaignResponse | None:
         state_file = self._state_path(campaign_id)
