@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+
+# Local runtime campaign data
+data/
+/data/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+
+# OS & IDEs
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,398 @@
+"""FastAPI entrypoint for the Agent Pixelate Backend Orchestrator.
+
+Exposes:
+- `POST /api/campaigns/generate`: Validates `CampaignRequest`, initializes a
+  task-scoped Band room, dispatches the initial prompt to `@visual_pixelate`,
+  and returns `campaign_id`.
+- `WS /ws/campaign/{campaign_id}`: Streams live `AgentEvent` JSON objects from
+  the Band room (or local async event bus fallback) to the Next.js frontend.
+- `GET /api/campaigns/{campaign_id}`: Returns the complete aggregated
+  `VisualOutput` + `CopyOutput` state from persistent storage (`/data/campaigns`).
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import mimetypes
+import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from typing import Any
+
+from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+
+from orchestrator.band_client import BandAdapter
+from orchestrator.config import Settings, get_settings
+from orchestrator.event_bus import AsyncEventBus
+from orchestrator.storage import CampaignStore
+from orchestrator.workflow import CampaignCoordinator
+from shared.schemas import (
+    AgentEvent,
+    AgentEventInput,
+    BandMemoryEntry,
+    CampaignGenerateResponse,
+    CampaignRequest,
+    CampaignResponse,
+    CopyOutput,
+    EventType,
+    VisualOutput,
+    utc_now,
+)
+
+logger = logging.getLogger("agent_pixelate.orchestrator")
+
+
+def _configure_logging(level: str) -> None:
+    logging.basicConfig(
+        level=getattr(logging, level.upper(), logging.INFO),
+        format="%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
+    )
+
+
+def create_app(settings: Settings | None = None) -> FastAPI:
+    """Factory that builds a configured FastAPI application instance."""
+    cfg = settings or get_settings()
+    _configure_logging(cfg.log_level)
+
+    data_dir = cfg.resolve_data_dir()
+    store = CampaignStore(base_dir=data_dir)
+    event_bus = AsyncEventBus()
+    band = BandAdapter(settings=cfg, event_bus=event_bus, store=store)
+    coordinator = CampaignCoordinator(
+        settings=cfg,
+        store=store,
+        event_bus=event_bus,
+        band=band,
+    )
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        await band.startup()
+        await coordinator.startup()
+        logger.info(
+            "Agent Pixelate Orchestrator ready (transport=%s, storage=%s)",
+            band.active_transport,
+            data_dir,
+        )
+        try:
+            yield
+        finally:
+            await coordinator.shutdown()
+            await band.shutdown()
+            logger.info("Agent Pixelate Orchestrator shut down cleanly.")
+
+    app = FastAPI(
+        title=cfg.app_name,
+        version=cfg.app_version,
+        description=(
+            "Multi-agent AI marketing campaign orchestrator powered by Band (`band.ai`) "
+            "rooms, @mention handoffs, shared Band Memories, and Agent37 cloud sandboxes."
+        ),
+        lifespan=lifespan,
+    )
+
+    # Store runtime services on app.state for dependency access & tests
+    app.state.settings = cfg
+    app.state.store = store
+    app.state.event_bus = event_bus
+    app.state.band = band
+    app.state.coordinator = coordinator
+
+    # CORS middleware for Next.js frontend and Agent37 HTTPS preview origins
+    allow_all = "*" in cfg.cors_origin_list
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"] if allow_all else cfg.cors_origin_list,
+        allow_credentials=not allow_all,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    @app.exception_handler(ValueError)
+    async def value_error_handler(_request: Request, exc: ValueError) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"detail": str(exc)},
+        )
+
+    @app.get("/health", tags=["system"])
+    async def health() -> dict[str, Any]:
+        """Service health, Band integration status, and Agent37 runtime diagnostics."""
+        return {
+            "status": "ok",
+            "service": cfg.app_name,
+            "version": cfg.app_version,
+            "environment": cfg.environment,
+            "storage_dir": str(store.base_dir),
+            "band": band.status_summary(),
+            "agents_service_configured": bool(cfg.agents_service_url),
+            "sandbox_runtime": os.environ.get("AGENT37_RUNTIME", "standard"),
+            "timestamp": utc_now().isoformat(),
+        }
+
+    @app.post(
+        "/api/campaigns/generate",
+        response_model=CampaignGenerateResponse,
+        status_code=status.HTTP_202_ACCEPTED,
+        tags=["campaigns"],
+    )
+    async def generate_campaign(
+        payload: CampaignRequest,
+    ) -> CampaignGenerateResponse:
+        """Validate `CampaignRequest`, create a Band room, and dispatch to `@visual_pixelate`."""
+        try:
+            campaign = await coordinator.start_campaign(payload)
+        except Exception as exc:
+            logger.exception("Failed to initialize campaign")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to start campaign orchestration: {exc}",
+            ) from exc
+
+        return CampaignGenerateResponse(
+            campaign_id=campaign.campaign_id,
+            status=campaign.status,
+            room_id=campaign.room_id,
+            transport=campaign.transport,
+            ws_url=f"/ws/campaign/{campaign.campaign_id}",
+            detail_url=f"/api/campaigns/{campaign.campaign_id}",
+            created_at=campaign.created_at,
+        )
+
+    @app.get(
+        "/api/campaigns",
+        response_model=list[CampaignResponse],
+        tags=["campaigns"],
+    )
+    async def list_campaigns(
+        limit: int = Query(default=25, ge=1, le=100),
+    ) -> list[CampaignResponse]:
+        """List recent campaigns from persistent storage."""
+        return await store.list_campaigns(limit=limit)
+
+    @app.get(
+        "/api/campaigns/{campaign_id}",
+        response_model=CampaignResponse,
+        tags=["campaigns"],
+    )
+    async def get_campaign(campaign_id: str) -> CampaignResponse:
+        """Return the complete aggregated `VisualOutput` + `CopyOutput` state from storage."""
+        try:
+            campaign = await store.get_campaign(campaign_id)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+            ) from exc
+        if campaign is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Campaign '{campaign_id}' not found.",
+            )
+        return campaign
+
+    @app.get(
+        "/api/campaigns/{campaign_id}/memories",
+        response_model=list[BandMemoryEntry],
+        tags=["band"],
+    )
+    async def get_campaign_memories(campaign_id: str) -> list[BandMemoryEntry]:
+        """Inspect shared Band Memories stored for a campaign's collaboration room."""
+        campaign = await store.get_campaign(campaign_id)
+        if campaign is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Campaign '{campaign_id}' not found.",
+            )
+        return await band.get_room_memories(campaign_id, campaign.room_id)
+
+    @app.get(
+        "/api/campaigns/{campaign_id}/assets/{filename}",
+        tags=["assets"],
+    )
+    async def get_campaign_asset(campaign_id: str, filename: str) -> FileResponse:
+        """Serve generated media assets persisted in `/data/campaigns/{campaign_id}/assets/`."""
+        try:
+            asset_path = store.resolve_asset_path(campaign_id, filename)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+            ) from exc
+
+        if asset_path is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Asset '{filename}' not found for campaign '{campaign_id}'.",
+            )
+        media_type, _ = mimetypes.guess_type(str(asset_path))
+        return FileResponse(
+            path=asset_path,
+            media_type=media_type or "application/octet-stream",
+            filename=asset_path.name,
+        )
+
+    @app.post(
+        "/api/campaigns/{campaign_id}/callbacks/visual",
+        response_model=CampaignResponse,
+        tags=["callbacks"],
+    )
+    async def visual_agent_callback(
+        campaign_id: str, visual_output: VisualOutput
+    ) -> CampaignResponse:
+        """Callback invoked by `@visual_pixelate` upon finishing visual asset generation.
+
+        Persists the output, stores the visual brief in Band Memory, and posts an
+        explicit `@copy_pixelate` mention into the Band room to trigger copy generation.
+        """
+        if visual_output.campaign_id != campaign_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="visual_output.campaign_id does not match URL campaign_id.",
+            )
+        try:
+            return await coordinator.handle_visual_output(campaign_id, visual_output)
+        except KeyError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+            ) from exc
+
+    @app.post(
+        "/api/campaigns/{campaign_id}/callbacks/copy",
+        response_model=CampaignResponse,
+        tags=["callbacks"],
+    )
+    async def copy_agent_callback(
+        campaign_id: str, copy_output: CopyOutput
+    ) -> CampaignResponse:
+        """Callback invoked by `@copy_pixelate` upon finishing multi-platform copy."""
+        if copy_output.campaign_id != campaign_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="copy_output.campaign_id does not match URL campaign_id.",
+            )
+        try:
+            return await coordinator.handle_copy_output(campaign_id, copy_output)
+        except KeyError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+            ) from exc
+
+    @app.post(
+        "/api/campaigns/{campaign_id}/events",
+        response_model=AgentEvent,
+        status_code=status.HTTP_201_CREATED,
+        tags=["callbacks"],
+    )
+    async def publish_agent_event(
+        campaign_id: str, body: AgentEventInput
+    ) -> AgentEvent:
+        """Allow external agents or Band webhooks to emit live `AgentEvent` updates."""
+        campaign = await store.get_campaign(campaign_id)
+        if campaign is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Campaign '{campaign_id}' not found.",
+            )
+        return await band.post_room_message(
+            campaign_id=campaign_id,
+            room_id=campaign.room_id,
+            sender=body.sender,
+            message=body.message,
+            event_type=body.event_type,
+            payload=body.payload,
+            trigger_mentions=True,
+        )
+
+    @app.websocket("/ws/campaign/{campaign_id}")
+    async def campaign_websocket(websocket: WebSocket, campaign_id: str) -> None:
+        """Stream live `AgentEvent` JSON frames from the campaign's Band room to the frontend."""
+        try:
+            campaign = await store.get_campaign(campaign_id)
+        except ValueError:
+            await websocket.close(code=1008, reason="Invalid campaign_id")
+            return
+
+        await websocket.accept()
+
+        # Hydrate event bus history from disk in case the orchestrator restarted
+        if campaign is not None and campaign.events:
+            await event_bus.seed_history(campaign_id, campaign.events)
+
+        room_id = campaign.room_id if campaign is not None else f"room_{campaign_id}"
+        transport = campaign.transport if campaign is not None else band.active_transport
+        sent_ids: set[str] = set()
+
+        async def _drain_client_frames() -> None:
+            """Consume client ping/text frames so disconnects are detected immediately."""
+            try:
+                while True:
+                    msg = await websocket.receive_text()
+                    if msg.strip().lower() == "ping":
+                        await websocket.send_json({"type": "pong", "timestamp": utc_now().isoformat()})
+            except WebSocketDisconnect:
+                return
+            except Exception:
+                return
+
+        reader_task = asyncio.create_task(_drain_client_frames())
+
+        try:
+            async with event_bus.subscribe(campaign_id, replay_history=True) as (
+                history,
+                queue,
+            ):
+                # 1. Replay all prior room events in order
+                for past_event in history:
+                    await websocket.send_json(past_event.model_dump(mode="json"))
+                    sent_ids.add(past_event.event_id)
+
+                # 2. Stream live events as they arrive from Band / local event bus
+                while not reader_task.done():
+                    try:
+                        next_event = await asyncio.wait_for(
+                            queue.get(), timeout=cfg.ws_heartbeat_interval_s
+                        )
+                    except TimeoutError:
+                        if reader_task.done():
+                            break
+                        heartbeat = AgentEvent(
+                            campaign_id=campaign_id,
+                            room_id=room_id,
+                            event_type=EventType.HEARTBEAT,
+                            sender="system",
+                            message="heartbeat",
+                            transport=transport,
+                        )
+                        await websocket.send_json(heartbeat.model_dump(mode="json"))
+                        continue
+
+                    if next_event.event_id in sent_ids:
+                        continue
+                    sent_ids.add(next_event.event_id)
+                    await websocket.send_json(next_event.model_dump(mode="json"))
+        except WebSocketDisconnect:
+            logger.debug("WebSocket disconnected for campaign %s", campaign_id)
+        except Exception as exc:
+            logger.warning("WebSocket stream error for campaign %s: %s", campaign_id, exc)
+        finally:
+            reader_task.cancel()
+            await asyncio.gather(reader_task, return_exceptions=True)
+
+    return app
+
+
+app = create_app()
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    settings = get_settings()
+    uvicorn.run(
+        "orchestrator.main:app",
+        host=settings.orchestrator_host,
+        port=settings.orchestrator_port,
+        reload=settings.environment == "development",
+    )

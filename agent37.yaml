@@ -1,0 +1,74 @@
+# Agent37 Cloud Sandbox Deployment Manifest (https://agent37.com)
+# Isolates Agent Pixelate Orchestrator inside a gVisor-backed persistent sandbox
+# with durable volume storage for generated campaign media assets.
+
+version: "1"
+
+project: agent-pixelate
+service: orchestrator
+
+sandbox:
+  # Standard gVisor-isolated container sandbox (no nested Docker daemon required)
+  type: sandbox
+  isolation: gvisor
+  architecture: linux/amd64
+  nested_docker: false
+  template:
+    name: agent-pixelate-orchestrator
+    dockerfile: ./Dockerfile
+    context: .
+  resources:
+    vcpu: 2
+    memory_mb: 2048
+    disk_gb: 20
+  lifecycle:
+    auto_sleep_minutes: 30
+    wake_on_http: true
+
+storage:
+  volumes:
+    - name: pixelate-campaign-assets
+      mount_path: /data/campaigns
+      size_gb: 15
+      persistent: true
+      description: "Durable storage for campaign JSON state, Band memory mirrors, and generated visual assets."
+
+network:
+  ports:
+    - name: http-ws
+      container_port: 8000
+      protocol: http
+      public_https: true
+      websocket: true
+  healthcheck:
+    path: /health
+    interval_seconds: 20
+    timeout_seconds: 5
+    initial_delay_seconds: 10
+
+security:
+  run_as_non_root: true
+  run_as_user: 1000
+  allow_privilege_escalation: false
+  drop_capabilities:
+    - ALL
+
+env:
+  ENVIRONMENT: production
+  CAMPAIGN_DATA_DIR: /data/campaigns
+  AGENT37_RUNTIME: gvisor
+  ORCHESTRATOR_HOST: "0.0.0.0"
+  ORCHESTRATOR_PORT: "8000"
+  BAND_REST_URL: "https://app.band.ai"
+  BAND_WS_URL: "wss://app.band.ai/api/v1/socket/websocket"
+  BAND_FALLBACK_ON_ERROR: "true"
+  ENABLE_LOCAL_AGENT_FALLBACK: "true"
+
+secrets:
+  - BAND_API_KEY
+  - BAND_VISUAL_AGENT_KEY
+  - BAND_COPY_AGENT_KEY
+  - ADAL_API_KEY
+  - FINCH_API_KEY
+  - OPENAI_API_KEY
+  - GEMINI_API_KEY
