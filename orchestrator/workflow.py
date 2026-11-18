@@ -85,6 +85,7 @@ class CampaignCoordinator:
         self.band = band
         self._background_tasks: set[asyncio.Task[None]] = set()
         self._http: httpx.AsyncClient | None = None
+        self._gemini_image_disabled: bool = False
 
         # Wire Band `@mention` routing directly to agent dispatchers
         self.band.register_mention_handler(
@@ -1308,10 +1309,11 @@ class CampaignCoordinator:
                     "contents": [{"parts": [{"text": prompt}]}],
                     "generationConfig": {
                         "temperature": 0.65,
+                        "maxOutputTokens": 900,
                         "responseMimeType": "application/json",
                     },
                 },
-                timeout=10.0,
+                timeout=8.0,
             )
             if resp.status_code >= 400:
                 logger.warning("Gemini JSON call (%s) HTTP %s: %s", model, resp.status_code, resp.text[:200])
@@ -1336,7 +1338,12 @@ class CampaignCoordinator:
     async def _gemini_generate_image(self, prompt: str) -> tuple[bytes, str] | None:
         """Generate a real campaign visual via Gemini Flash Image when `GEMINI_API_KEY` is configured."""
         api_key = self.settings.gemini_api_key
-        if not api_key or os.environ.get("PYTEST_CURRENT_TEST") or self._http is None:
+        if (
+            not api_key
+            or self._gemini_image_disabled
+            or os.environ.get("PYTEST_CURRENT_TEST")
+            or self._http is None
+        ):
             return None
 
         model = os.environ.get("GEMINI_IMAGE_MODEL", "gemini-3.1-flash-lite-image")
@@ -1349,8 +1356,16 @@ class CampaignCoordinator:
                     "contents": [{"parts": [{"text": prompt}]}],
                     "generationConfig": {"responseModalities": ["IMAGE"]},
                 },
-                timeout=14.0,
+                timeout=6.0,
             )
+            if resp.status_code in (400, 403, 404):
+                logger.warning(
+                    "Gemini image model %s unavailable (HTTP %s); disabling for fast studio SVG rendering.",
+                    model,
+                    resp.status_code,
+                )
+                self._gemini_image_disabled = True
+                return None
             if resp.status_code >= 400:
                 logger.warning("Gemini image call (%s) HTTP %s", model, resp.status_code)
                 return None
