@@ -36,6 +36,7 @@ export type AgentSender =
   | "BAND Room"
   | "@VisualAgent"
   | "@CopyAgent"
+  | "@CriticAgent"
   | "Orchestrator";
 
 export type CampaignStatus =
@@ -88,15 +89,100 @@ export interface BandDelegationEdge {
   timestamp: string;
 }
 
+export interface BandToolCallTrace {
+  toolName: string;
+  framework: string;
+  argsSummary: string;
+  resultSummary: string;
+  durationMs: number;
+  status: "ok" | "error" | "blocked";
+}
+
+export interface BandTaskExecution {
+  executionId: string;
+  agentHandle: string;
+  framework: string;
+  triggerBy: string;
+  triggerReason: string;
+  focusMemoryIds: string[];
+  focusTokenEstimate: number;
+  toolCalls: BandToolCallTrace[];
+  status: "queued" | "running" | "completed" | "blocked_by_policy" | "failed";
+  durationMs: number;
+  startedAt: string;
+}
+
+export interface BandFocusWindow {
+  agentHandle: string;
+  totalRoomEvents: number;
+  focusedEventCount: number;
+  filteredNoiseCount: number;
+  includedMemoryKeys: string[];
+  includedMemoryIds: string[];
+  focusedTokensEst: number;
+  fullRoomTokensEst: number;
+  contextSavingsPct: number;
+  focusSummary: string;
+}
+
+export interface BandPolicyAuthority {
+  handle: string;
+  apiScope: "human_me_api" | "agent_runtime_api";
+  canReadMemories: boolean;
+  canWriteMemories: boolean;
+  canPromoteBrandMemory: boolean;
+  canApproveHandoff: boolean;
+  canModifyGovernance: boolean;
+  canMention: string[];
+  allowedTools: string[];
+  muted: boolean;
+}
+
+export interface BandLoopGuardState {
+  maxAgentHops: number;
+  currentHops: number;
+  blockedLoops: number;
+  strictMode: boolean;
+  circuitOpen: boolean;
+  lastRoute: string;
+}
+
+export interface BandCriticCheck {
+  category: string;
+  label: string;
+  passed: boolean;
+  score: number;
+  detail: string;
+}
+
+export interface BandCriticReport {
+  reportId: string;
+  overallScore: number;
+  grade: string;
+  summary: string;
+  wcagContrastRatio: number;
+  checks: BandCriticCheck[];
+  recommendedMention?: string | null;
+}
+
 export interface BandRoomState {
   campaignId: string;
   roomId: string;
+  brandName: string;
   transport: "band" | "local_fallback";
   approvalRequired: boolean;
   pendingApproval: boolean;
+  autoCriticQa: boolean;
   participants: BandParticipant[];
   memories: BandSharedMemory[];
+  brandMemories: BandSharedMemory[];
   delegations: BandDelegationEdge[];
+  executions: BandTaskExecution[];
+  focusWindows: BandFocusWindow[];
+  policies: BandPolicyAuthority[];
+  loopGuard: BandLoopGuardState;
+  criticReport: BandCriticReport | null;
+  auditChainHead: string;
 }
 
 export interface DemoPreset {

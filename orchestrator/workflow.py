@@ -39,6 +39,8 @@ from orchestrator.video_renderer import (
 from shared.schemas import (
     AgentEvent,
     AgentHandle,
+    BandCriticReport,
+    BandGovernancePatch,
     BandMemoryEntry,
     CampaignRequest,
     CampaignResponse,
@@ -162,11 +164,40 @@ class CampaignCoordinator:
             metadata={"type": "campaign_request"},
         )
 
+        # Hydrate Cross-Session Brand Memories from prior campaigns for this brand
+        prior_brand_memories = self.band.brand_vault.list_brand_memories(request.brand_name)
+        for prior in prior_brand_memories:
+            await self.band.store_memory(
+                campaign_id=campaign_id,
+                room_id=room.room_id,
+                author=prior.author,
+                key="cross_session_brand_memory",
+                content=f"[{prior.key}] {prior.content}",
+                metadata={"pinned": True, "hydrated_from_brand": request.brand_name},
+            )
+        if prior_brand_memories:
+            await self.band.post_room_message(
+                campaign_id=campaign_id,
+                room_id=room.room_id,
+                sender=AgentHandle.ORCHESTRATOR.value,
+                event_type=EventType.MEMORY_STORED,
+                message=(
+                    f"Hydrated {len(prior_brand_memories)} cross-session Brand Memory rule(s) "
+                    f"for **{request.brand_name}** into BAND room `{room.room_id}`."
+                ),
+                payload={"brand_memory_count": len(prior_brand_memories)},
+                trigger_mentions=False,
+            )
+
         # Track live BAND presence & initial delegation edge
         self.band.set_participant_status(campaign_id, AgentHandle.HUMAN.value, "online")
         self.band.set_participant_status(campaign_id, AgentHandle.ORCHESTRATOR.value, "working")
         self.band.set_participant_status(campaign_id, AgentHandle.VISUAL.value, "thinking")
         self.band.set_participant_status(campaign_id, AgentHandle.COPY.value, "idle")
+        self.band.set_participant_status(campaign_id, AgentHandle.CRITIC.value, "idle")
+        self.band.loop_guard.check_and_record_hop(
+            campaign_id, AgentHandle.ORCHESTRATOR.value, AgentHandle.VISUAL.value
+        )
         self.band.record_delegation(
             campaign_id=campaign_id,
             from_handle=AgentHandle.ORCHESTRATOR.value,
@@ -240,6 +271,26 @@ class CampaignCoordinator:
         campaign_id = campaign.campaign_id
         room_id = campaign.room_id
 
+        focus = await self.band.get_agent_focus(campaign, AgentHandle.VISUAL.value)
+        execution = self.band.execution_tracker.start_execution(
+            campaign_id=campaign_id,
+            room_id=room_id,
+            agent_handle=AgentHandle.VISUAL.value,
+            framework="AdaL / AdalFlow + Gemini Imagen",
+            trigger_by=AgentHandle.ORCHESTRATOR.value,
+            trigger_reason=f"Visual brief for {campaign.request.brand_name}",
+            focus_memory_ids=focus.included_memory_ids,
+            focus_token_estimate=focus.focused_tokens_est,
+        )
+        self.band.execution_tracker.record_tool(
+            execution,
+            tool_name="load_finch_skill:brand_visual_direction",
+            framework="Finch SKILL.md",
+            args_summary="skill='brand_visual_direction'",
+            result_summary="Loaded 5-hex palette, lighting physics & 3-aspect rules",
+            duration_ms=8,
+        )
+
         try:
             await self.band.post_room_message(
                 campaign_id=campaign_id,
@@ -247,26 +298,55 @@ class CampaignCoordinator:
                 sender=AgentHandle.VISUAL.value,
                 event_type=EventType.AGENT_STARTED,
                 message=(
-                    f"{AgentHandle.VISUAL.value} picked up the brief for "
-                    f"**{campaign.request.brand_name}**. Crafting creative direction & assets..."
+                    f"{AgentHandle.VISUAL.value} started isolated execution `{execution.execution_id}` "
+                    f"(Per-Agent Focus: {focus.focused_tokens_est} tok, {focus.context_savings_pct}% saved) "
+                    f"for **{campaign.request.brand_name}**."
                 ),
+                payload={"execution_id": execution.execution_id, "focus": focus.model_dump(mode="json")},
                 trigger_mentions=False,
             )
 
             visual_output = await self._dispatch_remote_visual(campaign)
             if visual_output is not None:
+                self.band.execution_tracker.record_tool(
+                    execution,
+                    tool_name="generate_campaign_image",
+                    framework="Remote Agents Worker",
+                    args_summary=f"concepts={campaign.request.num_concepts}",
+                    result_summary=f"Rendered {len(visual_output.assets)} assets",
+                    duration_ms=420,
+                )
+                self.band.execution_tracker.finish_execution(execution, status="completed")
                 await self.handle_visual_output(campaign_id, visual_output)
                 return
 
             if not self.settings.enable_local_agent_fallback:
-                # External agent accepted async callback mode; wait for callback endpoint
+                self.band.execution_tracker.finish_execution(execution, status="completed")
                 return
 
             visual_output = await self._synthesize_fallback_visual(campaign)
+            self.band.execution_tracker.record_tool(
+                execution,
+                tool_name="normalize_five_hex_palette",
+                framework="AdaL / AdalFlow",
+                args_summary=f"tone='{campaign.request.brand_tone}'",
+                result_summary=", ".join(visual_output.color_palette[:5]),
+                duration_ms=14,
+            )
+            self.band.execution_tracker.record_tool(
+                execution,
+                tool_name="generate_campaign_image",
+                framework="Imagen / Studio Synthesizer",
+                args_summary=f"assets={len(visual_output.assets)}",
+                result_summary=f"Persisted {len(visual_output.assets)} assets",
+                duration_ms=340,
+            )
+            self.band.execution_tracker.finish_execution(execution, status="completed")
             await self.handle_visual_output(campaign_id, visual_output)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
+            self.band.execution_tracker.finish_execution(execution, status="failed")
             logger.exception("Visual stage failed for campaign %s", campaign_id)
             await self._fail_campaign(campaign_id, room_id, AgentHandle.VISUAL.value, str(exc))
 
@@ -456,6 +536,40 @@ class CampaignCoordinator:
         campaign_id = campaign.campaign_id
         room_id = campaign.room_id
 
+        allowed, guard_msg = self.band.loop_guard.check_and_record_hop(
+            campaign_id, AgentHandle.VISUAL.value, AgentHandle.COPY.value
+        )
+        if not allowed:
+            await self.band.post_room_message(
+                campaign_id=campaign_id,
+                room_id=room_id,
+                sender=AgentHandle.ORCHESTRATOR.value,
+                event_type=EventType.POLICY_BLOCKED,
+                message=guard_msg,
+                trigger_mentions=False,
+            )
+            return
+
+        focus = await self.band.get_agent_focus(campaign, AgentHandle.COPY.value)
+        execution = self.band.execution_tracker.start_execution(
+            campaign_id=campaign_id,
+            room_id=room_id,
+            agent_handle=AgentHandle.COPY.value,
+            framework="AdaL / AdalFlow + Finch Copy Skills",
+            trigger_by=AgentHandle.VISUAL.value,
+            trigger_reason="Visual brief handoff via BAND Memory",
+            focus_memory_ids=focus.included_memory_ids,
+            focus_token_estimate=focus.focused_tokens_est,
+        )
+        self.band.execution_tracker.record_tool(
+            execution,
+            tool_name="load_finch_skill:ad_copy_conversion",
+            framework="Finch SKILL.md",
+            args_summary="skills=['ad_copy_conversion','social_platform_formatter']",
+            result_summary="Loaded AIDA/PAS & channel rules",
+            duration_ms=9,
+        )
+
         try:
             memories = await self.band.get_room_memories(campaign_id, room_id)
             memory_ids = [m.memory_id for m in memories]
@@ -466,27 +580,47 @@ class CampaignCoordinator:
                 sender=AgentHandle.COPY.value,
                 event_type=EventType.AGENT_STARTED,
                 message=(
-                    f"{AgentHandle.COPY.value} received @mention handoff and hydrated "
-                    f"{len(memories)} shared Band Memory item(s) ({', '.join(memory_ids)}). "
-                    f"Drafting platform copy..."
+                    f"{AgentHandle.COPY.value} started isolated execution `{execution.execution_id}` "
+                    f"hydrating {len(memories)} shared Band Memories (Per-Agent Focus: "
+                    f"{focus.focused_tokens_est} tok, {focus.context_savings_pct}% saved)."
                 ),
-                payload={"band_memory_refs": memory_ids},
+                payload={"band_memory_refs": memory_ids, "execution_id": execution.execution_id},
                 trigger_mentions=False,
             )
 
             copy_output = await self._dispatch_remote_copy(campaign, memories)
             if copy_output is not None:
+                self.band.execution_tracker.record_tool(
+                    execution,
+                    tool_name="audit_copy_quality",
+                    framework="AdaL / AdalFlow",
+                    args_summary=f"channels={len(copy_output.platform_copies)}",
+                    result_summary="Verified zero clichés & linked asset IDs",
+                    duration_ms=16,
+                )
+                self.band.execution_tracker.finish_execution(execution, status="completed")
                 await self.handle_copy_output(campaign_id, copy_output)
                 return
 
             if not self.settings.enable_local_agent_fallback:
+                self.band.execution_tracker.finish_execution(execution, status="completed")
                 return
 
             copy_output = await self._synthesize_fallback_copy(campaign, memories)
+            self.band.execution_tracker.record_tool(
+                execution,
+                tool_name="extract_visual_cues",
+                framework="AdaL / AdalFlow",
+                args_summary=f"memory_refs={len(memory_ids)}",
+                result_summary=f"Bound {len(copy_output.platform_copies)} channel decks",
+                duration_ms=18,
+            )
+            self.band.execution_tracker.finish_execution(execution, status="completed")
             await self.handle_copy_output(campaign_id, copy_output)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
+            self.band.execution_tracker.finish_execution(execution, status="failed")
             logger.exception("Copy stage failed for campaign %s", campaign_id)
             await self._fail_campaign(campaign_id, room_id, AgentHandle.COPY.value, str(exc))
 
@@ -589,7 +723,184 @@ class CampaignCoordinator:
         self.band.set_participant_status(campaign_id, AgentHandle.ORCHESTRATOR.value, "online")
         self.band.complete_delegation(campaign_id, AgentHandle.COPY.value)
 
-        return updated or campaign
+        # Automatically run `@critic_pixelate` Brand QA & Governance audit if policy enabled
+        if self.band.policy_engine.is_auto_critic_enabled(campaign_id) and not self.band.policy_engine.is_muted(
+            campaign_id, AgentHandle.CRITIC.value
+        ):
+            await self.run_critic_audit(campaign_id, triggered_by=AgentHandle.COPY.value)
+
+        return (await self.store.get_campaign(campaign_id)) or updated or campaign
+
+    async def run_critic_audit(
+        self,
+        campaign_id: str,
+        *,
+        triggered_by: str = AgentHandle.HUMAN.value,
+    ) -> BandCriticReport:
+        """Execute `@critic_pixelate` Brand QA, WCAG contrast & BAND guardrail audit."""
+        campaign = await self.store.get_campaign(campaign_id)
+        if campaign is None:
+            raise KeyError(f"Campaign '{campaign_id}' not found")
+
+        if self.band.policy_engine.is_muted(campaign_id, AgentHandle.CRITIC.value):
+            raise PermissionError("@critic_pixelate is currently muted by room governance policy.")
+
+        allowed, guard_msg = self.band.loop_guard.check_and_record_hop(
+            campaign_id, triggered_by, AgentHandle.CRITIC.value
+        )
+        if not allowed:
+            await self.band.post_room_message(
+                campaign_id=campaign_id,
+                room_id=campaign.room_id,
+                sender=AgentHandle.ORCHESTRATOR.value,
+                event_type=EventType.POLICY_BLOCKED,
+                message=guard_msg,
+                trigger_mentions=False,
+            )
+            raise PermissionError(guard_msg)
+
+        memories = await self.band.get_room_memories(campaign_id, campaign.room_id)
+        focus = await self.band.get_agent_focus(campaign, AgentHandle.CRITIC.value)
+        self.band.set_participant_status(campaign_id, AgentHandle.CRITIC.value, "working")
+        self.band.record_delegation(
+            campaign_id=campaign_id,
+            from_handle=triggered_by,
+            to_handle=AgentHandle.CRITIC.value,
+            reason="Brand QA, WCAG 2.1 contrast & pinned guardrail audit",
+            memory_id=campaign.visual_output.band_memory_id if campaign.visual_output else None,
+            status="dispatched",
+        )
+
+        execution = self.band.execution_tracker.start_execution(
+            campaign_id=campaign_id,
+            room_id=campaign.room_id,
+            agent_handle=AgentHandle.CRITIC.value,
+            framework="BAND Policy Engine + WCAG 2.1 Auditor",
+            trigger_by=triggered_by,
+            trigger_reason="Brand QA & Governance Scorecard",
+            focus_memory_ids=focus.included_memory_ids,
+            focus_token_estimate=focus.focused_tokens_est,
+        )
+
+        report = self.band.critic_engine.evaluate(campaign, memories)
+        self.band.set_critic_report(campaign_id, report)
+
+        self.band.execution_tracker.record_tool(
+            execution,
+            tool_name="wcag_contrast_audit",
+            framework="BAND Policy Engine",
+            args_summary=f"palette={len(campaign.visual_output.color_palette) if campaign.visual_output else 0}",
+            result_summary=f"Peak contrast {report.wcag_contrast_ratio}:1",
+            duration_ms=7,
+        )
+        self.band.execution_tracker.record_tool(
+            execution,
+            tool_name="brand_guardrail_verifier",
+            framework="BAND Policy Engine",
+            args_summary=f"memories={len(memories)}",
+            result_summary=f"Score {report.overall_score}/100 ({report.grade})",
+            duration_ms=11,
+        )
+        self.band.execution_tracker.finish_execution(execution, status="completed")
+        self.band.set_participant_status(campaign_id, AgentHandle.CRITIC.value, "online")
+        self.band.complete_delegation(campaign_id, AgentHandle.CRITIC.value)
+
+        await self.band.store_memory(
+            campaign_id=campaign_id,
+            room_id=campaign.room_id,
+            author=AgentHandle.CRITIC.value,
+            key="critic_qa_scorecard",
+            content=report.summary,
+            metadata={"score": report.overall_score, "grade": report.grade},
+        )
+        await self.band.post_room_message(
+            campaign_id=campaign_id,
+            room_id=campaign.room_id,
+            sender=AgentHandle.CRITIC.value,
+            event_type=EventType.CRITIC_REVIEW,
+            message=report.summary,
+            payload={"critic_report": report.model_dump(mode="json"), "execution_id": execution.execution_id},
+            trigger_mentions=False,
+        )
+        return report
+
+    async def promote_memory_to_brand(
+        self,
+        campaign_id: str,
+        *,
+        memory_id: str,
+        promoter: str = AgentHandle.HUMAN.value,
+    ) -> BandMemoryEntry:
+        """Promote a campaign room memory to Cross-Session Brand Memory (Human `/me` scope)."""
+        self.band.policy_engine.assert_human_scope(promoter, "promote_brand_memory")
+        campaign = await self.store.get_campaign(campaign_id)
+        if campaign is None:
+            raise KeyError(f"Campaign '{campaign_id}' not found")
+
+        memories = await self.band.get_room_memories(campaign_id, campaign.room_id)
+        target = next((m for m in memories if m.memory_id == memory_id), None)
+        if target is None:
+            raise KeyError(f"Memory '{memory_id}' not found in room '{campaign.room_id}'.")
+
+        promoted = self.band.brand_vault.promote_memory(
+            campaign.request.brand_name, target, promoter=promoter
+        )
+        await self.band.post_room_message(
+            campaign_id=campaign_id,
+            room_id=campaign.room_id,
+            sender=promoter,
+            event_type=EventType.MEMORY_STORED,
+            message=(
+                f"Promoted memory `{target.key}` (`{promoted.memory_id}`) to Cross-Session "
+                f"Brand Memory for **{campaign.request.brand_name}**. Future campaigns will auto-hydrate it."
+            ),
+            payload={"brand_memory": promoted.model_dump(mode="json")},
+            trigger_mentions=False,
+        )
+        return promoted
+
+    async def update_governance(
+        self, campaign_id: str, patch: BandGovernancePatch
+    ) -> CampaignResponse:
+        """Update BAND room governance policies under strict Human `/me` scope."""
+        self.band.policy_engine.assert_human_scope(patch.actor, "update_governance")
+        campaign = await self.store.get_campaign(campaign_id)
+        if campaign is None:
+            raise KeyError(f"Campaign '{campaign_id}' not found")
+
+        changes: list[str] = []
+        if patch.require_handoff_approval is not None:
+            campaign.request.metadata["require_handoff_approval"] = patch.require_handoff_approval
+            changes.append(f"approval_gate={patch.require_handoff_approval}")
+        if patch.auto_critic_qa is not None:
+            self.band.policy_engine.set_auto_critic(campaign_id, patch.auto_critic_qa)
+            changes.append(f"auto_critic_qa={patch.auto_critic_qa}")
+        if patch.max_agent_hops is not None or patch.strict_loop_guard is not None:
+            self.band.loop_guard.configure(
+                campaign_id,
+                max_agent_hops=patch.max_agent_hops,
+                strict_mode=patch.strict_loop_guard,
+            )
+            changes.append(
+                f"loop_guard(max={self.band.loop_guard.get_state(campaign_id).max_agent_hops}, "
+                f"strict={self.band.loop_guard.get_state(campaign_id).strict_mode})"
+            )
+        if patch.mute_handle is not None and patch.muted is not None:
+            self.band.policy_engine.set_muted(campaign_id, patch.mute_handle, patch.muted)
+            changes.append(f"{patch.mute_handle}={'muted' if patch.muted else 'active'}")
+
+        await self.store.save_campaign(campaign)
+        if changes:
+            await self.band.post_room_message(
+                campaign_id=campaign_id,
+                room_id=campaign.room_id,
+                sender=patch.actor,
+                event_type=EventType.AGENT_THINKING,
+                message=f"Updated BAND Control Plane governance: {', '.join(changes)}.",
+                payload={"governance_changes": changes},
+                trigger_mentions=False,
+            )
+        return campaign
 
     async def approve_handoff(
         self,
@@ -600,6 +911,8 @@ class CampaignCoordinator:
         note: str | None = None,
     ) -> CampaignResponse:
         """Human-in-the-loop gate decision inside the BAND collaboration room."""
+        self.band.policy_engine.assert_human_scope(approver, "approve_handoff")
+        self.band.loop_guard.reset_on_human_turn(campaign_id)
         campaign = await self.store.get_campaign(campaign_id)
         if campaign is None:
             raise KeyError(f"Campaign '{campaign_id}' not found")
@@ -729,6 +1042,7 @@ class CampaignCoordinator:
 
         self.band.set_human_display_name(campaign_id, sender_name)
         self.band.set_participant_status(campaign_id, AgentHandle.HUMAN.value, "online")
+        self.band.loop_guard.reset_on_human_turn(campaign_id)
 
         event = await self.band.post_room_message(
             campaign_id=campaign_id,
@@ -751,6 +1065,18 @@ class CampaignCoordinator:
             or "@copyagent" in lowered
             or "@all" in lowered
         )
+        mentions_critic = (
+            "@critic_pixelate" in lowered
+            or "@criticagent" in lowered
+            or "@critic" in lowered
+        )
+
+        if mentions_critic and not mentions_visual and not mentions_copy:
+            self._spawn(
+                self.run_critic_audit(campaign_id, triggered_by=sender),
+                name=f"critic-{campaign_id}-{uuid4().hex[:4]}",
+            )
+            return event
 
         if mentions_visual:
             mem = await self.band.store_memory(

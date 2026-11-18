@@ -20,13 +20,27 @@ from uuid import uuid4
 
 import httpx
 
+from orchestrator.band_control_plane import (
+    BandAuditLedger,
+    BandBrandMemoryVault,
+    BandCriticEngine,
+    BandExecutionTracker,
+    BandFocusProjector,
+    BandLoopGuard,
+    BandPolicyEngine,
+    build_agent_directory,
+)
 from orchestrator.config import Settings
 from orchestrator.event_bus import AsyncEventBus
 from orchestrator.storage import CampaignStore
 from shared.schemas import (
     AgentEvent,
     AgentHandle,
+    BandAgentDirectoryEntry,
+    BandAuditEntry,
+    BandCriticReport,
     BandDelegationEdge,
+    BandFocusWindow,
     BandMemoryEntry,
     BandParticipant,
     BandRoomSnapshot,
@@ -88,8 +102,18 @@ class BandAdapter:
         self._presence: dict[str, dict[str, Literal["online", "thinking", "working", "awaiting_approval", "idle"]]] = {}
         self._delegations: dict[str, list[BandDelegationEdge]] = {}
         self._human_names: dict[str, str] = {}
+        self._critic_reports: dict[str, BandCriticReport] = {}
 
-        # Canonical two sponsor-required agent identities
+        # BAND Control Plane & Governance Engines
+        self.policy_engine = BandPolicyEngine()
+        self.loop_guard = BandLoopGuard()
+        self.focus_projector = BandFocusProjector()
+        self.execution_tracker = BandExecutionTracker()
+        self.brand_vault = BandBrandMemoryVault(base_dir=store.base_dir)
+        self.critic_engine = BandCriticEngine()
+        self.audit_ledger = BandAuditLedger()
+
+        # Canonical three heterogeneous specialist agent identities in the BAND Mesh
         self.identities: dict[str, BandAgentIdentity] = {
             AgentHandle.VISUAL.value: BandAgentIdentity(
                 handle=AgentHandle.VISUAL.value,
@@ -110,6 +134,14 @@ class BandAdapter:
                     "and crafts high-converting multi-platform campaign copy."
                 ),
                 api_key=settings.band_copy_agent_key,
+            ),
+            AgentHandle.CRITIC.value: BandAgentIdentity(
+                handle=AgentHandle.CRITIC.value,
+                display_name="Critic Pixelate",
+                role_description=(
+                    "Independent Brand QA & Governance Critic auditing WCAG 2.1 contrast, "
+                    "anti-cliché copy discipline, asset-copy pairing, and pinned BAND guardrails."
+                ),
             ),
         }
 
@@ -681,6 +713,7 @@ class BandAdapter:
 
         vis_ident = self.identities.get(AgentHandle.VISUAL.value)
         copy_ident = self.identities.get(AgentHandle.COPY.value)
+        critic_ident = self.identities.get(AgentHandle.CRITIC.value)
 
         return [
             BandParticipant(
@@ -689,8 +722,8 @@ class BandAdapter:
                 role="Human Director · Approvals & @mention Delegation",
                 kind="human",
                 status=presence.get(AgentHandle.HUMAN.value, "online"),
-                framework="BAND Human-in-the-Loop",
-                skills=["campaign_brief", "approval_gate", "live_feedback"],
+                framework="BAND Human /me API",
+                skills=["campaign_brief", "approval_gate", "governance"],
                 registered_remote=True,
                 last_active_at=campaign.updated_at,
             ),
@@ -727,16 +760,48 @@ class BandAdapter:
                 registered_remote=bool(copy_ident and copy_ident.registered_remote),
                 last_active_at=campaign.updated_at,
             ),
+            BandParticipant(
+                handle=AgentHandle.CRITIC.value,
+                display_name="Critic Pixelate",
+                role="Brand QA, WCAG Contrast & Guardrail Auditor",
+                kind="agent",
+                status=presence.get(AgentHandle.CRITIC.value, "online"),
+                framework="BAND Policy Engine + WCAG 2.1",
+                skills=["wcag_contrast_audit", "brand_guardrail_verifier"],
+                registered_remote=bool(critic_ident and critic_ident.registered_remote),
+                last_active_at=campaign.updated_at,
+            ),
         ]
 
-    async def build_room_snapshot(self, campaign: CampaignResponse) -> BandRoomSnapshot:
-        """Assemble the complete live BAND room state for frontend collaboration UI."""
+    def set_critic_report(self, campaign_id: str, report: BandCriticReport) -> None:
+        self._critic_reports[campaign_id] = report
+
+    def get_critic_report(self, campaign_id: str) -> BandCriticReport | None:
+        return self._critic_reports.get(campaign_id)
+
+    def get_agent_directory(self) -> list[BandAgentDirectoryEntry]:
+        remote_map = {h: ident.registered_remote for h, ident in self.identities.items()}
+        return build_agent_directory(remote_map)
+
+    def build_audit_log(self, campaign: CampaignResponse) -> list[BandAuditEntry]:
+        executions = self.execution_tracker.list_executions(campaign.campaign_id)
+        return self.audit_ledger.build_chain(campaign, executions)
+
+    async def get_agent_focus(
+        self, campaign: CampaignResponse, agent_handle: str
+    ) -> BandFocusWindow:
+        normalized = agent_handle if agent_handle.startswith("@") else f"@{agent_handle}"
         memories = await self.get_room_memories(campaign.campaign_id, campaign.room_id)
+        return self.focus_projector.project(campaign, memories, normalized)
+
+    async def build_room_snapshot(self, campaign: CampaignResponse) -> BandRoomSnapshot:
+        """Assemble the complete live BAND room & Control Plane state for collaboration UI."""
+        memories = await self.get_room_memories(campaign.campaign_id, campaign.room_id)
+        brand_memories = self.brand_vault.list_brand_memories(campaign.request.brand_name)
         approval_required = bool(campaign.request.metadata.get("require_handoff_approval", False))
         pending_approval = campaign.status == CampaignStatus.AWAITING_APPROVAL
         delegations = list(self._delegations.get(campaign.campaign_id, []))
 
-        # Hydrate delegation edges from persisted events if orchestrator restarted
         if not delegations:
             for evt in campaign.events:
                 if evt.event_type == EventType.AGENT_MENTION and evt.mentions:
@@ -758,17 +823,31 @@ class BandAdapter:
                             )
                         )
 
+        executions = self.execution_tracker.list_executions(campaign.campaign_id)
+        focus_windows = self.focus_projector.project_all(campaign, memories)
+        audit_chain = self.audit_ledger.build_chain(campaign, executions)
+        audit_head = audit_chain[-1].entry_hash if audit_chain else ""
+
         return BandRoomSnapshot(
             campaign_id=campaign.campaign_id,
             room_id=campaign.room_id,
+            brand_name=campaign.request.brand_name,
             transport=campaign.transport,
             status=campaign.status,
             approval_required=approval_required,
             pending_approval=pending_approval,
+            auto_critic_qa=self.policy_engine.is_auto_critic_enabled(campaign.campaign_id),
             participants=self.get_participants(campaign),
             memories=memories,
+            brand_memories=brand_memories,
             messages=[e for e in campaign.events if e.event_type != EventType.HEARTBEAT],
             delegations=delegations,
+            executions=executions,
+            focus_windows=focus_windows,
+            policies=self.policy_engine.get_policies(campaign.campaign_id),
+            loop_guard=self.loop_guard.get_state(campaign.campaign_id),
+            critic_report=self._critic_reports.get(campaign.campaign_id),
+            audit_chain_head=audit_head,
             updated_at=utc_now(),
         )
 

@@ -36,10 +36,16 @@ from pydantic import BaseModel
 from shared.schemas import (
     AgentEvent,
     AgentEventInput,
+    BandAgentDirectoryEntry,
     BandApprovalInput,
+    BandAuditEntry,
+    BandCriticReport,
+    BandFocusWindow,
+    BandGovernancePatch,
     BandMemoryEntry,
     BandMemoryInput,
     BandMessageInput,
+    BandPromoteMemoryInput,
     BandRoomSnapshot,
     CampaignGenerateResponse,
     CampaignRequest,
@@ -131,6 +137,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def value_error_handler(_request: Request, exc: ValueError) -> JSONResponse:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
+            content={"detail": str(exc)},
+        )
+
+    @app.exception_handler(PermissionError)
+    async def permission_error_handler(
+        _request: Request, exc: PermissionError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN,
             content={"detail": str(exc)},
         )
 
@@ -319,6 +334,108 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except ValueError as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+            ) from exc
+
+    @app.get(
+        "/api/band/registry",
+        response_model=list[BandAgentDirectoryEntry],
+        tags=["band-control-plane"],
+    )
+    async def list_band_agent_registry() -> list[BandAgentDirectoryEntry]:
+        """BAND Agentic Mesh Discovery Registry across heterogeneous frameworks."""
+        return band.get_agent_directory()
+
+    @app.get(
+        "/api/band/brands/{brand_name}/memories",
+        response_model=list[BandMemoryEntry],
+        tags=["band-control-plane"],
+    )
+    async def list_cross_session_brand_memories(brand_name: str) -> list[BandMemoryEntry]:
+        """Retrieve persistent Cross-Session Brand Memories shared across BAND rooms."""
+        return band.brand_vault.list_brand_memories(brand_name)
+
+    @app.get(
+        "/api/campaigns/{campaign_id}/band/focus/{agent_handle}",
+        response_model=BandFocusWindow,
+        tags=["band-control-plane"],
+    )
+    async def get_band_agent_focus(
+        campaign_id: str, agent_handle: str
+    ) -> BandFocusWindow:
+        """Inspect BAND Per-Agent Focus context isolation & token savings for an agent."""
+        campaign = await store.get_campaign(campaign_id)
+        if campaign is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Campaign '{campaign_id}' not found.",
+            )
+        return await band.get_agent_focus(campaign, agent_handle)
+
+    @app.get(
+        "/api/campaigns/{campaign_id}/band/audit",
+        response_model=list[BandAuditEntry],
+        tags=["band-control-plane"],
+    )
+    async def get_band_audit_ledger(campaign_id: str) -> list[BandAuditEntry]:
+        """Export SHA-256 hash-chained BAND Governance & Interaction Audit Ledger."""
+        campaign = await store.get_campaign(campaign_id)
+        if campaign is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Campaign '{campaign_id}' not found.",
+            )
+        return band.build_audit_log(campaign)
+
+    @app.post(
+        "/api/campaigns/{campaign_id}/band/memories/promote",
+        response_model=BandMemoryEntry,
+        status_code=status.HTTP_201_CREATED,
+        tags=["band-control-plane"],
+    )
+    async def promote_band_memory(
+        campaign_id: str, body: BandPromoteMemoryInput
+    ) -> BandMemoryEntry:
+        """Promote a room memory to Cross-Session Brand Memory (Human /me scope)."""
+        try:
+            return await coordinator.promote_memory_to_brand(
+                campaign_id=campaign_id,
+                memory_id=body.memory_id,
+                promoter=body.promoter,
+            )
+        except KeyError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+            ) from exc
+
+    @app.patch(
+        "/api/campaigns/{campaign_id}/band/governance",
+        response_model=BandRoomSnapshot,
+        tags=["band-control-plane"],
+    )
+    async def patch_band_governance(
+        campaign_id: str, body: BandGovernancePatch
+    ) -> BandRoomSnapshot:
+        """Update BAND Control Plane policies (Human /me scope: loop guard, auto QA, mutes)."""
+        try:
+            updated = await coordinator.update_governance(campaign_id, body)
+            return await band.build_room_snapshot(updated)
+        except KeyError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+            ) from exc
+
+    @app.post(
+        "/api/campaigns/{campaign_id}/band/critic/run",
+        response_model=BandCriticReport,
+        tags=["band-control-plane"],
+    )
+    async def run_band_critic(campaign_id: str) -> BandCriticReport:
+        """Trigger `@critic_pixelate` Brand QA, WCAG contrast & guardrail audit."""
+        try:
+            return await coordinator.run_critic_audit(campaign_id)
+        except KeyError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
             ) from exc
 
     @app.get(

@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import { CampaignAssets, CampaignStatus, ConnectionMode } from "@/types/campaign";
 import { cn } from "@/lib/utils";
-import { ClerkAuthControls } from "@/components/ClerkAuthProvider";
 
 interface TopNavProps {
   campaignId: string | null;
@@ -152,8 +151,6 @@ export function TopNav({
               </button>
             </div>
           )}
-
-          <ClerkAuthControls />
         </div>
       </div>
     </header>
