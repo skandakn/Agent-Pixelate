@@ -26,7 +26,12 @@ from orchestrator.storage import CampaignStore
 from shared.schemas import (
     AgentEvent,
     AgentHandle,
+    BandDelegationEdge,
     BandMemoryEntry,
+    BandParticipant,
+    BandRoomSnapshot,
+    CampaignResponse,
+    CampaignStatus,
     EventType,
     utc_now,
 )
@@ -80,6 +85,9 @@ class BandAdapter:
         self._mention_handlers: dict[str, list[MentionHandler]] = {}
         self._room_ws_tasks: dict[str, asyncio.Task[None]] = {}
         self._rooms: dict[str, BandRoom] = {}
+        self._presence: dict[str, dict[str, Literal["online", "thinking", "working", "awaiting_approval", "idle"]]] = {}
+        self._delegations: dict[str, list[BandDelegationEdge]] = {}
+        self._human_names: dict[str, str] = {}
 
         # Canonical two sponsor-required agent identities
         self.identities: dict[str, BandAgentIdentity] = {
@@ -605,6 +613,164 @@ class BandAdapter:
                     await handler(event)
                 except Exception as exc:
                     logger.exception("Mention handler failed for %s: %s", mention, exc)
+
+    def set_participant_status(
+        self,
+        campaign_id: str,
+        handle: str,
+        status: Literal["online", "thinking", "working", "awaiting_approval", "idle"],
+    ) -> None:
+        """Update live presence state for a human or AI participant in a BAND room."""
+        room_map = self._presence.setdefault(campaign_id, {})
+        room_map[handle] = status
+
+    def set_human_display_name(self, campaign_id: str, display_name: str | None) -> None:
+        if display_name and display_name.strip():
+            self._human_names[campaign_id] = display_name.strip()
+
+    def record_delegation(
+        self,
+        *,
+        campaign_id: str,
+        from_handle: str,
+        to_handle: str,
+        reason: str,
+        memory_id: str | None = None,
+        status: Literal["dispatched", "awaiting_approval", "completed"] = "dispatched",
+    ) -> BandDelegationEdge:
+        """Record an auditable BAND task delegation edge in the campaign room."""
+        edge = BandDelegationEdge(
+            from_handle=from_handle,
+            to_handle=to_handle,
+            reason=reason,
+            memory_id=memory_id,
+            status=status,
+        )
+        self._delegations.setdefault(campaign_id, []).append(edge)
+        return edge
+
+    def complete_delegation(self, campaign_id: str, to_handle: str) -> None:
+        """Mark the most recent active delegation targeting `to_handle` as completed."""
+        for edge in reversed(self._delegations.get(campaign_id, [])):
+            if edge.to_handle == to_handle and edge.status != "completed":
+                edge.status = "completed"
+                break
+
+    def get_participants(self, campaign: CampaignResponse) -> list[BandParticipant]:
+        """Return live participant roster with presence, frameworks, and Finch skills."""
+        cid = campaign.campaign_id
+        presence = self._presence.get(cid, {})
+        human_name = self._human_names.get(cid) or str(
+            campaign.request.metadata.get("human_name") or "Creative Director (You)"
+        )
+
+        # Derive smart defaults from campaign lifecycle if explicit presence wasn't set
+        def _default_visual_status() -> Literal["online", "thinking", "working", "awaiting_approval", "idle"]:
+            if campaign.status == CampaignStatus.VISUAL_GENERATING:
+                return "working"
+            if campaign.status == CampaignStatus.AWAITING_APPROVAL:
+                return "awaiting_approval"
+            return "online"
+
+        def _default_copy_status() -> Literal["online", "thinking", "working", "awaiting_approval", "idle"]:
+            if campaign.status == CampaignStatus.COPY_GENERATING:
+                return "working"
+            if campaign.status == CampaignStatus.AWAITING_APPROVAL:
+                return "idle"
+            return "online"
+
+        vis_ident = self.identities.get(AgentHandle.VISUAL.value)
+        copy_ident = self.identities.get(AgentHandle.COPY.value)
+
+        return [
+            BandParticipant(
+                handle=AgentHandle.HUMAN.value,
+                display_name=human_name,
+                role="Human Director · Approvals & @mention Delegation",
+                kind="human",
+                status=presence.get(AgentHandle.HUMAN.value, "online"),
+                framework="BAND Human-in-the-Loop",
+                skills=["campaign_brief", "approval_gate", "live_feedback"],
+                registered_remote=True,
+                last_active_at=campaign.updated_at,
+            ),
+            BandParticipant(
+                handle=AgentHandle.ORCHESTRATOR.value,
+                display_name="BAND Orchestrator",
+                role="Shared Room Router & Memory Sync",
+                kind="orchestrator",
+                status=presence.get(AgentHandle.ORCHESTRATOR.value, "online"),
+                framework="BAND Protocol + FastAPI",
+                skills=["room_routing", "shared_memory_sync", "ffmpeg_mp4_studio"],
+                registered_remote=self.active_transport == "band",
+                last_active_at=campaign.updated_at,
+            ),
+            BandParticipant(
+                handle=AgentHandle.VISUAL.value,
+                display_name="Visual Pixelate",
+                role="Creative Director & Visual Asset Synthesizer",
+                kind="agent",
+                status=presence.get(AgentHandle.VISUAL.value, _default_visual_status()),
+                framework="AdaL / AdalFlow + Gemini Imagen",
+                skills=["brand_visual_direction", "motion_video_direction"],
+                registered_remote=bool(vis_ident and vis_ident.registered_remote),
+                last_active_at=campaign.updated_at,
+            ),
+            BandParticipant(
+                handle=AgentHandle.COPY.value,
+                display_name="Copy Pixelate",
+                role="Conversion Copywriter & Social Strategist",
+                kind="agent",
+                status=presence.get(AgentHandle.COPY.value, _default_copy_status()),
+                framework="AdaL / AdalFlow + Finch Skills",
+                skills=["ad_copy_conversion", "social_platform_formatter"],
+                registered_remote=bool(copy_ident and copy_ident.registered_remote),
+                last_active_at=campaign.updated_at,
+            ),
+        ]
+
+    async def build_room_snapshot(self, campaign: CampaignResponse) -> BandRoomSnapshot:
+        """Assemble the complete live BAND room state for frontend collaboration UI."""
+        memories = await self.get_room_memories(campaign.campaign_id, campaign.room_id)
+        approval_required = bool(campaign.request.metadata.get("require_handoff_approval", False))
+        pending_approval = campaign.status == CampaignStatus.AWAITING_APPROVAL
+        delegations = list(self._delegations.get(campaign.campaign_id, []))
+
+        # Hydrate delegation edges from persisted events if orchestrator restarted
+        if not delegations:
+            for evt in campaign.events:
+                if evt.event_type == EventType.AGENT_MENTION and evt.mentions:
+                    for target in evt.mentions:
+                        delegations.append(
+                            BandDelegationEdge(
+                                edge_id=f"del_{evt.event_id[-8:]}",
+                                from_handle=evt.sender,
+                                to_handle=target,
+                                reason=evt.message[:140],
+                                memory_id=evt.payload.get("band_memory_id")
+                                or evt.payload.get("brief_memory_id"),
+                                status="awaiting_approval"
+                                if pending_approval and target == AgentHandle.COPY.value
+                                else "completed"
+                                if campaign.status == CampaignStatus.COMPLETED
+                                else "dispatched",
+                                timestamp=evt.timestamp,
+                            )
+                        )
+
+        return BandRoomSnapshot(
+            campaign_id=campaign.campaign_id,
+            room_id=campaign.room_id,
+            transport=campaign.transport,
+            status=campaign.status,
+            approval_required=approval_required,
+            pending_approval=pending_approval,
+            participants=self.get_participants(campaign),
+            memories=memories,
+            messages=[e for e in campaign.events if e.event_type != EventType.HEARTBEAT],
+            delegations=delegations,
+            updated_at=utc_now(),
+        )
 
     def status_summary(self) -> dict[str, Any]:
         """Diagnostic summary returned by `/health`."""

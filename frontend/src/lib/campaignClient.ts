@@ -1,6 +1,10 @@
 import {
   AgentEvent,
   AgentSender,
+  BandDelegationEdge,
+  BandParticipant,
+  BandRoomState,
+  BandSharedMemory,
   CampaignAssets,
   CampaignBrief,
   CampaignVideoAsset,
@@ -58,12 +62,14 @@ export interface StreamCallbacks {
   onModeResolved: (mode: "live" | "mock", notice?: string) => void;
   onEvent: (event: AgentEvent) => void;
   onPartialAssets: (partial: Partial<CampaignAssets>) => void;
+  onApprovalRequired?: () => void;
   onComplete: (assets: CampaignAssets) => void;
   onError: (message: string) => void;
 }
 
 export interface CampaignSessionController {
   cancel: () => void;
+  resumeAfterApproval?: (note?: string) => void;
 }
 
 interface BackendVisualAsset {
@@ -141,6 +147,7 @@ function normalizeAspect(raw?: string): VisualCreative["aspectRatio"] {
 
 function mapBackendSender(raw?: string): AgentSender {
   const value = (raw || "").toLowerCase();
+  if (value.includes("human")) return "You";
   if (value.includes("visual")) return "@VisualAgent";
   if (value.includes("copy")) return "@CopyAgent";
   if (value.includes("orchestrat")) return "Orchestrator";
@@ -488,7 +495,71 @@ export function runSimulatedCampaignStream(
     });
   });
 
+  const scheduleCopyPhase = (approvalNote?: string) => {
+    if (approvalNote) {
+      emit(
+        "context_handoff",
+        "You",
+        "handoff",
+        "Human Director Approved Visual Handoff",
+        `Approved visual direction with guidance: "${approvalNote}". Delegating to @CopyAgent.`
+      );
+    }
+
+    schedule(650, () => {
+      emit(
+        "copy_agent",
+        "@CopyAgent",
+        "thought",
+        "Aligning Copy Hooks with Visual Motif",
+        `Ingested @VisualAgent palette, hero motif, and shared BAND memories${approvalNote ? ` (including director note: "${approvalNote}")` : ""}. Drafting ${brief.platforms.join(" + ")} copy decks calibrated to "${brief.brandTone}" voice.`
+      );
+    });
+
+    schedule(1600, () => {
+      emit(
+        "copy_agent",
+        "@CopyAgent",
+        "asset_ready",
+        "Multi-Platform Copy Deck Compiled",
+        `Completed ${fullAssets.socialPosts.length} social posts, ${fullAssets.metaAds.length} Meta Ad variants with CTA previews, and ${fullAssets.hashtags.length} curated hashtags.`
+      );
+      callbacks.onPartialAssets({
+        socialPosts: fullAssets.socialPosts,
+        metaAds: fullAssets.metaAds,
+        hashtags: fullAssets.hashtags,
+      });
+    });
+
+    schedule(2250, () => {
+      emit(
+        "final_campaign",
+        "Orchestrator",
+        "complete",
+        "Campaign Kit Assembled & Ready to Export",
+        `All visual and copy assets synchronized for "${brief.productName}". Ready for clipboard copy or .JSON / .ZIP export.`
+      );
+      callbacks.onComplete(fullAssets);
+    });
+  };
+
   schedule(3000, () => {
+    callbacks.onPartialAssets({
+      handoff: fullAssets.handoff,
+    });
+    if (brief.requireHandoffApproval) {
+      emit(
+        "context_handoff",
+        "@VisualAgent",
+        "handoff",
+        "Awaiting Human Director Approval",
+        `Visual direction & color tokens saved to BAND Memory. Review and approve to delegate to @CopyAgent, or @mention @visual_pixelate for revisions.`,
+        fullAssets.handoff ?? undefined
+      );
+      callbacks.onApprovalRequired?.();
+      return;
+    }
+
     emit(
       "context_handoff",
       "@VisualAgent",
@@ -497,51 +568,17 @@ export function runSimulatedCampaignStream(
       `Passing visual motif, palette hex tokens, and mood directives to @CopyAgent inside BAND Shared Room.`,
       fullAssets.handoff ?? undefined
     );
-    callbacks.onPartialAssets({
-      handoff: fullAssets.handoff,
-    });
-  });
-
-  schedule(3850, () => {
-    emit(
-      "copy_agent",
-      "@CopyAgent",
-      "thought",
-      "Aligning Copy Hooks with Visual Motif",
-      `Ingested @VisualAgent palette & hero motif. Drafting high-converting ${brief.platforms.join(" + ")} copy decks calibrated to "${brief.brandTone}" voice.`
-    );
-  });
-
-  schedule(4700, () => {
-    emit(
-      "copy_agent",
-      "@CopyAgent",
-      "asset_ready",
-      "Multi-Platform Copy Deck Compiled",
-      `Completed ${fullAssets.socialPosts.length} social posts, ${fullAssets.metaAds.length} Meta Ad variants with CTA previews, and ${fullAssets.hashtags.length} curated hashtags.`
-    );
-    callbacks.onPartialAssets({
-      socialPosts: fullAssets.socialPosts,
-      metaAds: fullAssets.metaAds,
-      hashtags: fullAssets.hashtags,
-    });
-  });
-
-  schedule(5350, () => {
-    emit(
-      "final_campaign",
-      "Orchestrator",
-      "complete",
-      "Campaign Kit Assembled & Ready to Export",
-      `All visual and copy assets synchronized for "${brief.productName}". Ready for clipboard copy or .JSON / .ZIP export.`
-    );
-    callbacks.onComplete(fullAssets);
+    scheduleCopyPhase();
   });
 
   return {
     cancel: () => {
       cancelled = true;
       timers.forEach((t) => clearTimeout(t));
+    },
+    resumeAfterApproval: (note?: string) => {
+      if (cancelled) return;
+      scheduleCopyPhase(note);
     },
   };
 }
@@ -621,7 +658,9 @@ export function launchCampaignSession(
         });
       }
 
-      if (
+      if (detail.status === "awaiting_approval") {
+        callbacks.onApprovalRequired?.();
+      } else if (
         finalizeIfDone &&
         (detail.status === "completed" ||
           (detail.visual_output && detail.copy_output))
@@ -667,6 +706,9 @@ export function launchCampaignSession(
             p.toLowerCase().replace(/\s+/g, "_")
           ),
           num_concepts: 3,
+          metadata: {
+            require_handoff_approval: Boolean(brief.requireHandoffApproval),
+          },
         }),
       });
       clearTimeout(timeout);
@@ -836,7 +878,304 @@ export function launchCampaignSession(
         fallbackController.cancel();
       }
     },
+    resumeAfterApproval: (note?: string) => {
+      fallbackController?.resumeAfterApproval?.(note);
+    },
   };
+}
+
+export function buildDefaultBandRoomState(
+  campaignId: string | null,
+  brief: CampaignBrief,
+  status: string,
+  handoff: ContextHandoffPayload | null
+): BandRoomState {
+  const cid = campaignId || "room_preview";
+  const roomId = `room_${cid}`;
+  const visualStatus: BandParticipant["status"] =
+    status === "running" && !handoff
+      ? "working"
+      : status === "awaiting_approval"
+        ? "awaiting_approval"
+        : "online";
+  const copyStatus: BandParticipant["status"] =
+    status === "running" && handoff
+      ? "working"
+      : status === "awaiting_approval"
+        ? "idle"
+        : "online";
+
+  const participants: BandParticipant[] = [
+    {
+      handle: "@human_director",
+      displayName: "Creative Director (You)",
+      role: "Approvals & @mention Delegation",
+      kind: "human",
+      status: "online",
+      framework: "BAND Human-in-the-Loop",
+      skills: ["brief", "approval_gate", "revisions"],
+      registeredRemote: true,
+    },
+    {
+      handle: "@orchestrator_pixelate",
+      displayName: "BAND Orchestrator",
+      role: "Shared Room Router & Memory Sync",
+      kind: "orchestrator",
+      status: status === "running" ? "working" : "online",
+      framework: "BAND Protocol + FastAPI",
+      skills: ["room_routing", "shared_memory", "mp4_studio"],
+      registeredRemote: false,
+    },
+    {
+      handle: "@visual_pixelate",
+      displayName: "Visual Pixelate",
+      role: "Creative Director & Asset Synthesizer",
+      kind: "agent",
+      status: visualStatus,
+      framework: "AdaL / AdalFlow + Imagen",
+      skills: ["brand_visual_direction", "motion_video_direction"],
+      registeredRemote: false,
+    },
+    {
+      handle: "@copy_pixelate",
+      displayName: "Copy Pixelate",
+      role: "Conversion Copywriter & Social Strategist",
+      kind: "agent",
+      status: copyStatus,
+      framework: "AdaL / AdalFlow + Finch Skills",
+      skills: ["ad_copy_conversion", "social_platform_formatter"],
+      registeredRemote: false,
+    },
+  ];
+
+  const memories: BandSharedMemory[] = [];
+  if (campaignId) {
+    memories.push({
+      memoryId: `mem_brief_${cid.slice(-6)}`,
+      roomId,
+      author: "@orchestrator_pixelate",
+      key: "campaign_brief",
+      content: `Brand: ${brief.productName} | Tone: ${brief.brandTone} | Audience: ${brief.targetAudience} | Channels: ${brief.platforms.join(", ")}`,
+      pinned: true,
+      bandSynced: true,
+      createdAt: new Date().toISOString(),
+    });
+  }
+  if (handoff) {
+    memories.push({
+      memoryId: `mem_vis_${cid.slice(-6)}`,
+      roomId,
+      author: "@visual_pixelate",
+      key: "visual_brief",
+      content: `Mood: ${handoff.dominantMood} | Motif: ${handoff.heroMotif} | Palette: ${handoff.paletteHexes.join(", ")}`,
+      pinned: true,
+      bandSynced: true,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  const delegations: BandDelegationEdge[] = [];
+  if (campaignId) {
+    delegations.push({
+      edgeId: `del_1_${cid.slice(-4)}`,
+      fromHandle: "@orchestrator_pixelate",
+      toHandle: "@visual_pixelate",
+      reason: `Generate multi-aspect visual system for ${brief.productName}`,
+      memoryId: memories[0]?.memoryId,
+      status: handoff ? "completed" : "dispatched",
+      timestamp: new Date().toISOString(),
+    });
+  }
+  if (handoff) {
+    delegations.push({
+      edgeId: `del_2_${cid.slice(-4)}`,
+      fromHandle: "@visual_pixelate",
+      toHandle: "@copy_pixelate",
+      reason:
+        status === "awaiting_approval"
+          ? "Awaiting Human Director approval before copy synthesis"
+          : "Visual brief & hex palette handoff for platform copy",
+      memoryId: memories[1]?.memoryId,
+      status:
+        status === "awaiting_approval"
+          ? "awaiting_approval"
+          : status === "completed"
+            ? "completed"
+            : "dispatched",
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  return {
+    campaignId: cid,
+    roomId,
+    transport: "local_fallback",
+    approvalRequired: Boolean(brief.requireHandoffApproval),
+    pendingApproval: status === "awaiting_approval",
+    participants,
+    memories,
+    delegations,
+  };
+}
+
+export async function fetchBandRoomSnapshot(
+  campaignId: string
+): Promise<BandRoomState | null> {
+  const { apiBase } = resolveBackendEndpoints();
+  try {
+    const res = await fetch(`${apiBase}/api/campaigns/${campaignId}/band/room`);
+    if (!res.ok) return null;
+    const raw = (await res.json()) as {
+      campaign_id: string;
+      room_id: string;
+      transport: "band" | "local_fallback";
+      approval_required: boolean;
+      pending_approval: boolean;
+      participants: Array<{
+        handle: string;
+        display_name: string;
+        role: string;
+        kind: "human" | "orchestrator" | "agent";
+        status: BandParticipant["status"];
+        framework: string;
+        skills: string[];
+        registered_remote: boolean;
+      }>;
+      memories: Array<{
+        memory_id: string;
+        room_id: string;
+        author: string;
+        key: string;
+        content: string;
+        metadata?: { pinned?: boolean; band_synced?: boolean };
+        created_at: string;
+      }>;
+      delegations: Array<{
+        edge_id: string;
+        from_handle: string;
+        to_handle: string;
+        reason: string;
+        memory_id?: string | null;
+        status: BandDelegationEdge["status"];
+        timestamp: string;
+      }>;
+    };
+
+    return {
+      campaignId: raw.campaign_id,
+      roomId: raw.room_id,
+      transport: raw.transport,
+      approvalRequired: raw.approval_required,
+      pendingApproval: raw.pending_approval,
+      participants: raw.participants.map((p) => ({
+        handle: p.handle,
+        displayName: p.display_name,
+        role: p.role,
+        kind: p.kind,
+        status: p.status,
+        framework: p.framework,
+        skills: p.skills,
+        registeredRemote: p.registered_remote,
+      })),
+      memories: raw.memories.map((m) => ({
+        memoryId: m.memory_id,
+        roomId: m.room_id,
+        author: m.author,
+        key: m.key,
+        content: m.content,
+        pinned: Boolean(m.metadata?.pinned),
+        bandSynced: Boolean(m.metadata?.band_synced || raw.transport === "band"),
+        createdAt: m.created_at,
+      })),
+      delegations: raw.delegations.map((d) => ({
+        edgeId: d.edge_id,
+        fromHandle: d.from_handle,
+        toHandle: d.to_handle,
+        reason: d.reason,
+        memoryId: d.memory_id,
+        status: d.status,
+        timestamp: d.timestamp,
+      })),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function sendBandRoomMessage(
+  campaignId: string,
+  message: string,
+  senderName?: string
+): Promise<boolean> {
+  const { apiBase } = resolveBackendEndpoints();
+  const res = await fetch(`${apiBase}/api/campaigns/${campaignId}/band/messages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sender: "@human_director",
+      sender_name: senderName || "Creative Director",
+      message,
+    }),
+  });
+  return res.ok;
+}
+
+export async function pinBandRoomMemory(
+  campaignId: string,
+  key: string,
+  content: string
+): Promise<BandSharedMemory | null> {
+  const { apiBase } = resolveBackendEndpoints();
+  const res = await fetch(`${apiBase}/api/campaigns/${campaignId}/band/memories`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      author: "@human_director",
+      key,
+      content,
+      pinned: true,
+    }),
+  });
+  if (!res.ok) return null;
+  const raw = (await res.json()) as {
+    memory_id: string;
+    room_id: string;
+    author: string;
+    key: string;
+    content: string;
+    created_at: string;
+  };
+  return {
+    memoryId: raw.memory_id,
+    roomId: raw.room_id,
+    author: raw.author,
+    key: raw.key,
+    content: raw.content,
+    pinned: true,
+    bandSynced: true,
+    createdAt: raw.created_at,
+  };
+}
+
+export async function approveBandHandoff(
+  campaignId: string,
+  approved: boolean,
+  note?: string
+): Promise<boolean> {
+  const { apiBase } = resolveBackendEndpoints();
+  const res = await fetch(
+    `${apiBase}/api/campaigns/${campaignId}/band/approve-handoff`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        approver: "@human_director",
+        approved,
+        note: note?.trim() || null,
+      }),
+    }
+  );
+  return res.ok;
 }
 
 export async function requestCustomVideoCut(

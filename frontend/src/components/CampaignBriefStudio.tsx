@@ -295,6 +295,54 @@ export function CampaignBriefStudio({
             </p>
           )}
         </div>
+
+        {/* BAND Human-in-the-Loop Approval Gate Toggle */}
+        <div className="space-y-2">
+          <span className="block text-[12px] font-semibold tracking-[-0.01em] text-[#1D1D1F]">
+            BAND Collaboration Control
+          </span>
+          <label
+            className={cn(
+              "flex cursor-pointer items-center justify-between rounded-2xl border border-black/[0.08] bg-[#FBFBFD] px-3.5 py-3 transition hover:bg-[#F5F5F7]",
+              isRunning && "pointer-events-none opacity-60"
+            )}
+          >
+            <input
+              type="checkbox"
+              checked={Boolean(brief.requireHandoffApproval)}
+              onChange={(e) =>
+                onChangeBrief({
+                  ...brief,
+                  requireHandoffApproval: e.target.checked,
+                })
+              }
+              className="sr-only"
+            />
+            <div className="pr-3">
+              <div className="text-[13px] font-medium text-[#1D1D1F]">
+                Human Approval Gate
+              </div>
+              <div className="text-[11px] text-[#6E6E73]">
+                Review visuals before delegating to @CopyAgent
+              </div>
+            </div>
+            <span
+              className={cn(
+                "relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors duration-200",
+                brief.requireHandoffApproval ? "bg-[#0071E3]" : "bg-[#D2D2D7]"
+              )}
+            >
+              <span
+                className={cn(
+                  "inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform duration-200",
+                  brief.requireHandoffApproval
+                    ? "translate-x-[18px]"
+                    : "translate-x-[2px]"
+                )}
+              />
+            </span>
+          </label>
+        </div>
       </div>
 
       {/* Primary Apple Blue Pill CTA */}

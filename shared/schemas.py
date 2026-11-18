@@ -23,6 +23,7 @@ def utc_now() -> datetime:
 class AgentHandle(str, Enum):
     """Canonical Band agent handles registered for Agent Pixelate."""
 
+    HUMAN = "@human_director"
     ORCHESTRATOR = "@orchestrator_pixelate"
     VISUAL = "@visual_pixelate"
     COPY = "@copy_pixelate"
@@ -33,6 +34,7 @@ class CampaignStatus(str, Enum):
 
     QUEUED = "queued"
     VISUAL_GENERATING = "visual_generating"
+    AWAITING_APPROVAL = "awaiting_approval"
     HANDOFF_TO_COPY = "handoff_to_copy"
     COPY_GENERATING = "copy_generating"
     COMPLETED = "completed"
@@ -50,6 +52,11 @@ class EventType(str, Enum):
     ASSET_GENERATED = "asset_generated"
     MEMORY_STORED = "memory_stored"
     AGENT_MENTION = "agent_mention"
+    HUMAN_MESSAGE = "human_message"
+    PRESENCE_UPDATED = "presence_updated"
+    APPROVAL_REQUIRED = "approval_required"
+    APPROVAL_GRANTED = "approval_granted"
+    AGENT_REVISION = "agent_revision"
     VISUAL_COMPLETED = "visual_completed"
     COPY_COMPLETED = "copy_completed"
     CAMPAIGN_COMPLETED = "campaign_completed"
@@ -315,3 +322,83 @@ class AgentEventInput(BaseModel):
     message: str = Field(..., min_length=1)
     mentions: list[str] = Field(default_factory=list)
     payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class BandParticipant(BaseModel):
+    """Live participant presence and capability metadata inside a BAND room."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    handle: str = Field(..., min_length=1)
+    display_name: str = Field(..., min_length=1)
+    role: str = Field(..., min_length=1)
+    kind: Literal["human", "orchestrator", "agent"] = "agent"
+    status: Literal["online", "thinking", "working", "awaiting_approval", "idle"] = "online"
+    framework: str = Field(default="BAND Protocol")
+    skills: list[str] = Field(default_factory=list)
+    registered_remote: bool = False
+    last_active_at: datetime = Field(default_factory=utc_now)
+
+
+class BandDelegationEdge(BaseModel):
+    """Auditable task delegation / handoff edge recorded inside a BAND room."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    edge_id: str = Field(default_factory=lambda: f"del_{uuid4().hex[:10]}")
+    from_handle: str
+    to_handle: str
+    reason: str
+    memory_id: str | None = None
+    status: Literal["dispatched", "awaiting_approval", "completed"] = "dispatched"
+    timestamp: datetime = Field(default_factory=utc_now)
+
+
+class BandMessageInput(BaseModel):
+    """Human or teammate message posted into a campaign's BAND room."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    sender: str = Field(default=AgentHandle.HUMAN.value, min_length=1, max_length=80)
+    sender_name: str | None = Field(default=None, max_length=120)
+    message: str = Field(..., min_length=1, max_length=2500)
+
+
+class BandMemoryInput(BaseModel):
+    """Pin or write a shared context entry into the campaign's BAND Memory vault."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    author: str = Field(default=AgentHandle.HUMAN.value, min_length=1, max_length=80)
+    key: str = Field(default="brand_guardrail", min_length=1, max_length=80)
+    content: str = Field(..., min_length=2, max_length=3000)
+    pinned: bool = Field(default=True)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class BandApprovalInput(BaseModel):
+    """Human-in-the-loop gate decision before `@visual_pixelate` hands off to `@copy_pixelate`."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    approver: str = Field(default=AgentHandle.HUMAN.value, min_length=1, max_length=80)
+    approved: bool = Field(default=True)
+    note: str | None = Field(default=None, max_length=1500)
+
+
+class BandRoomSnapshot(BaseModel):
+    """Full live collaboration state of a campaign's BAND room."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    campaign_id: str
+    room_id: str
+    transport: Literal["band", "local_fallback"] = "local_fallback"
+    status: CampaignStatus
+    approval_required: bool = False
+    pending_approval: bool = False
+    participants: list[BandParticipant] = Field(default_factory=list)
+    memories: list[BandMemoryEntry] = Field(default_factory=list)
+    messages: list[AgentEvent] = Field(default_factory=list)
+    delegations: list[BandDelegationEdge] = Field(default_factory=list)
+    updated_at: datetime = Field(default_factory=utc_now)

@@ -162,6 +162,20 @@ class CampaignCoordinator:
             metadata={"type": "campaign_request"},
         )
 
+        # Track live BAND presence & initial delegation edge
+        self.band.set_participant_status(campaign_id, AgentHandle.HUMAN.value, "online")
+        self.band.set_participant_status(campaign_id, AgentHandle.ORCHESTRATOR.value, "working")
+        self.band.set_participant_status(campaign_id, AgentHandle.VISUAL.value, "thinking")
+        self.band.set_participant_status(campaign_id, AgentHandle.COPY.value, "idle")
+        self.band.record_delegation(
+            campaign_id=campaign_id,
+            from_handle=AgentHandle.ORCHESTRATOR.value,
+            to_handle=AgentHandle.VISUAL.value,
+            reason=f"Initial visual brief for {request.brand_name}",
+            memory_id=brief_memory.memory_id,
+            status="dispatched",
+        )
+
         # Explicitly @mention @visual_pixelate to kick off the visual pipeline
         initial_prompt = (
             f"{AgentHandle.VISUAL.value} New campaign brief ready for **{request.brand_name}** "
@@ -318,9 +332,24 @@ class CampaignCoordinator:
         )
         visual_output.band_memory_id = memory.memory_id
 
+        self.band.set_participant_status(campaign_id, AgentHandle.VISUAL.value, "online")
+        self.band.complete_delegation(campaign_id, AgentHandle.VISUAL.value)
+
+        require_approval = bool(
+            campaign.request.metadata.get("require_handoff_approval", False)
+        )
+        already_approved = bool(
+            campaign.request.metadata.get("_handoff_approved", False)
+        )
+
         # 2. Save aggregated visual state
+        next_status = (
+            CampaignStatus.AWAITING_APPROVAL
+            if (require_approval and not already_approved)
+            else CampaignStatus.HANDOFF_TO_COPY
+        )
         updated = await self.store.set_visual_output(
-            campaign_id, visual_output, status=CampaignStatus.HANDOFF_TO_COPY
+            campaign_id, visual_output, status=next_status
         )
 
         # 3. Emit MEMORY_STORED and VISUAL_COMPLETED events
@@ -356,7 +385,49 @@ class CampaignCoordinator:
             trigger_mentions=False,
         )
 
-        # 4. Explicit Band `@mention` handoff to `@copy_pixelate`
+        # 4A. Human-in-the-Loop BAND Approval Gate (if enabled)
+        if require_approval and not already_approved:
+            self.band.set_participant_status(
+                campaign_id, AgentHandle.VISUAL.value, "awaiting_approval"
+            )
+            self.band.record_delegation(
+                campaign_id=campaign_id,
+                from_handle=AgentHandle.VISUAL.value,
+                to_handle=AgentHandle.COPY.value,
+                reason="Awaiting human director approval before @copy_pixelate handoff",
+                memory_id=memory.memory_id,
+                status="awaiting_approval",
+            )
+            await self.band.post_room_message(
+                campaign_id=campaign_id,
+                room_id=campaign.room_id,
+                sender=AgentHandle.VISUAL.value,
+                event_type=EventType.APPROVAL_REQUIRED,
+                message=(
+                    f"{AgentHandle.HUMAN.value} Visual direction and {len(visual_output.assets)} assets "
+                    f"for **{campaign.request.brand_name}** are ready in Band Memory `{memory.memory_id}`. "
+                    f"Approve to delegate to {AgentHandle.COPY.value}, or @mention {AgentHandle.VISUAL.value} "
+                    f"with revision feedback."
+                ),
+                payload={
+                    "band_memory_id": memory.memory_id,
+                    "handoff_to": AgentHandle.COPY.value,
+                    "pending_approval": True,
+                },
+                trigger_mentions=False,
+            )
+            return updated or campaign
+
+        # 4B. Explicit Band `@mention` handoff to `@copy_pixelate`
+        self.band.set_participant_status(campaign_id, AgentHandle.COPY.value, "thinking")
+        self.band.record_delegation(
+            campaign_id=campaign_id,
+            from_handle=AgentHandle.VISUAL.value,
+            to_handle=AgentHandle.COPY.value,
+            reason=f"Visual brief handoff via Band Memory {memory.memory_id}",
+            memory_id=memory.memory_id,
+            status="dispatched",
+        )
         handoff_message = (
             f"{AgentHandle.COPY.value} Visual concepts and assets for "
             f"**{campaign.request.brand_name}** are ready! "
@@ -514,7 +585,372 @@ class CampaignCoordinator:
             trigger_mentions=False,
         )
 
+        self.band.set_participant_status(campaign_id, AgentHandle.COPY.value, "online")
+        self.band.set_participant_status(campaign_id, AgentHandle.ORCHESTRATOR.value, "online")
+        self.band.complete_delegation(campaign_id, AgentHandle.COPY.value)
+
         return updated or campaign
+
+    async def approve_handoff(
+        self,
+        campaign_id: str,
+        *,
+        approver: str = AgentHandle.HUMAN.value,
+        approved: bool = True,
+        note: str | None = None,
+    ) -> CampaignResponse:
+        """Human-in-the-loop gate decision inside the BAND collaboration room."""
+        campaign = await self.store.get_campaign(campaign_id)
+        if campaign is None:
+            raise KeyError(f"Campaign '{campaign_id}' not found")
+        if campaign.visual_output is None:
+            raise ValueError("Visual assets are not ready yet to approve.")
+
+        if not approved:
+            directive = (
+                note.strip()
+                if note and note.strip()
+                else "Refine visual contrast and typography hierarchy."
+            )
+            await self.post_human_room_message(
+                campaign_id=campaign_id,
+                sender=approver,
+                message=f"{AgentHandle.VISUAL.value} Revision requested before handoff: {directive}",
+            )
+            return (await self.store.get_campaign(campaign_id)) or campaign
+
+        note_memory_id: str | None = None
+        if note and note.strip():
+            mem = await self.band.store_memory(
+                campaign_id=campaign_id,
+                room_id=campaign.room_id,
+                author=approver,
+                key="human_approval_note",
+                content=note.strip(),
+                metadata={"pinned": True, "stage": "handoff_approval"},
+            )
+            note_memory_id = mem.memory_id
+
+        campaign.request.metadata["_handoff_approved"] = True
+        campaign.status = CampaignStatus.HANDOFF_TO_COPY
+        await self.store.save_campaign(campaign)
+
+        self.band.set_participant_status(campaign_id, AgentHandle.VISUAL.value, "online")
+        self.band.set_participant_status(campaign_id, AgentHandle.COPY.value, "working")
+        self.band.record_delegation(
+            campaign_id=campaign_id,
+            from_handle=approver,
+            to_handle=AgentHandle.COPY.value,
+            reason=note.strip() if note and note.strip() else "Approved visual handoff to Copy Agent",
+            memory_id=note_memory_id or campaign.visual_output.band_memory_id,
+            status="dispatched",
+        )
+
+        await self.band.post_room_message(
+            campaign_id=campaign_id,
+            room_id=campaign.room_id,
+            sender=approver,
+            event_type=EventType.APPROVAL_GRANTED,
+            message=(
+                f"Approved visual direction for **{campaign.request.brand_name}**"
+                + (f" — Note: {note.strip()}" if note and note.strip() else ".")
+            ),
+            payload={"approved": True, "note_memory_id": note_memory_id},
+            trigger_mentions=False,
+        )
+
+        handoff_msg = (
+            f"{AgentHandle.COPY.value} Human director approved visual direction "
+            f"(memory `{campaign.visual_output.band_memory_id}`"
+            + (f", guidance `{note_memory_id}`" if note_memory_id else "")
+            + "). Proceed with platform-native campaign copy."
+        )
+        await self.band.post_room_message(
+            campaign_id=campaign_id,
+            room_id=campaign.room_id,
+            sender=AgentHandle.VISUAL.value,
+            event_type=EventType.AGENT_MENTION,
+            message=handoff_msg,
+            payload={
+                "handoff_from": AgentHandle.VISUAL.value,
+                "handoff_to": AgentHandle.COPY.value,
+                "band_memory_id": campaign.visual_output.band_memory_id,
+            },
+            trigger_mentions=True,
+        )
+        return (await self.store.get_campaign(campaign_id)) or campaign
+
+    async def pin_room_memory(
+        self,
+        campaign_id: str,
+        *,
+        author: str = AgentHandle.HUMAN.value,
+        key: str = "brand_guardrail",
+        content: str,
+        pinned: bool = True,
+        metadata: dict[str, Any] | None = None,
+    ) -> BandMemoryEntry:
+        """Pin a human/team guideline directly into shared BAND Memory and notify the room."""
+        campaign = await self.store.get_campaign(campaign_id)
+        if campaign is None:
+            raise KeyError(f"Campaign '{campaign_id}' not found")
+
+        entry = await self.band.store_memory(
+            campaign_id=campaign_id,
+            room_id=campaign.room_id,
+            author=author,
+            key=key,
+            content=content,
+            metadata={**(metadata or {}), "pinned": pinned, "source": "human_room"},
+        )
+        await self.band.post_room_message(
+            campaign_id=campaign_id,
+            room_id=campaign.room_id,
+            sender=author,
+            event_type=EventType.MEMORY_STORED,
+            message=f"Pinned shared Band Memory `{entry.key}` (`{entry.memory_id}`): {content}",
+            payload={"memory": entry.model_dump(mode="json"), "pinned": pinned},
+            trigger_mentions=False,
+        )
+        return entry
+
+    async def post_human_room_message(
+        self,
+        campaign_id: str,
+        *,
+        sender: str = AgentHandle.HUMAN.value,
+        sender_name: str | None = None,
+        message: str,
+    ) -> AgentEvent:
+        """Post a human message into the BAND room and dispatch live `@mention` agent revisions."""
+        campaign = await self.store.get_campaign(campaign_id)
+        if campaign is None:
+            raise KeyError(f"Campaign '{campaign_id}' not found")
+
+        self.band.set_human_display_name(campaign_id, sender_name)
+        self.band.set_participant_status(campaign_id, AgentHandle.HUMAN.value, "online")
+
+        event = await self.band.post_room_message(
+            campaign_id=campaign_id,
+            room_id=campaign.room_id,
+            sender=sender,
+            event_type=EventType.HUMAN_MESSAGE,
+            message=message,
+            payload={"sender_name": sender_name or "Creative Director"},
+            trigger_mentions=False,
+        )
+
+        lowered = message.lower()
+        mentions_visual = (
+            "@visual_pixelate" in lowered
+            or "@visualagent" in lowered
+            or "@all" in lowered
+        )
+        mentions_copy = (
+            "@copy_pixelate" in lowered
+            or "@copyagent" in lowered
+            or "@all" in lowered
+        )
+
+        if mentions_visual:
+            mem = await self.band.store_memory(
+                campaign_id=campaign_id,
+                room_id=campaign.room_id,
+                author=sender,
+                key="human_visual_directive",
+                content=message,
+                metadata={"pinned": True, "target": AgentHandle.VISUAL.value},
+            )
+            self.band.set_participant_status(campaign_id, AgentHandle.VISUAL.value, "working")
+            self.band.record_delegation(
+                campaign_id=campaign_id,
+                from_handle=sender,
+                to_handle=AgentHandle.VISUAL.value,
+                reason=message[:140],
+                memory_id=mem.memory_id,
+                status="dispatched",
+            )
+            self._spawn(
+                self._run_visual_revision(
+                    campaign_id=campaign_id,
+                    directive=message,
+                    memory_id=mem.memory_id,
+                    chain_copy=mentions_copy,
+                ),
+                name=f"visual-rev-{campaign_id}-{uuid4().hex[:4]}",
+            )
+        elif mentions_copy:
+            mem = await self.band.store_memory(
+                campaign_id=campaign_id,
+                room_id=campaign.room_id,
+                author=sender,
+                key="human_copy_directive",
+                content=message,
+                metadata={"pinned": True, "target": AgentHandle.COPY.value},
+            )
+            self.band.set_participant_status(campaign_id, AgentHandle.COPY.value, "working")
+            self.band.record_delegation(
+                campaign_id=campaign_id,
+                from_handle=sender,
+                to_handle=AgentHandle.COPY.value,
+                reason=message[:140],
+                memory_id=mem.memory_id,
+                status="dispatched",
+            )
+            self._spawn(
+                self._run_copy_revision(
+                    campaign_id=campaign_id,
+                    directive=message,
+                    memory_id=mem.memory_id,
+                ),
+                name=f"copy-rev-{campaign_id}-{uuid4().hex[:4]}",
+            )
+        else:
+            await self.band.post_room_message(
+                campaign_id=campaign_id,
+                room_id=campaign.room_id,
+                sender=AgentHandle.ORCHESTRATOR.value,
+                event_type=EventType.AGENT_THINKING,
+                message=(
+                    f"Logged note in BAND room `{campaign.room_id}`. Tip: `@mention` "
+                    f"{AgentHandle.VISUAL.value}, {AgentHandle.COPY.value}, or `@all` "
+                    f"to delegate live creative revisions."
+                ),
+                trigger_mentions=False,
+            )
+
+        return event
+
+    async def _run_visual_revision(
+        self,
+        *,
+        campaign_id: str,
+        directive: str,
+        memory_id: str,
+        chain_copy: bool,
+    ) -> None:
+        """Re-run `@visual_pixelate` incorporating a live human directive & shared BAND memories."""
+        campaign = await self.store.get_campaign(campaign_id)
+        if campaign is None:
+            return
+        try:
+            memories = await self.band.get_room_memories(campaign_id, campaign.room_id)
+            pinned_notes = "\n".join(
+                f"- [{m.key}] {m.content}" for m in memories if m.metadata.get("pinned")
+            )
+            merged_notes = f"{campaign.request.additional_notes or ''}\nBAND Revision Directive: {directive}\n{pinned_notes}".strip()
+            campaign.request.additional_notes = merged_notes[:1450]
+            campaign.status = CampaignStatus.VISUAL_GENERATING
+            await self.store.save_campaign(campaign)
+
+            await self.band.post_room_message(
+                campaign_id=campaign_id,
+                room_id=campaign.room_id,
+                sender=AgentHandle.VISUAL.value,
+                event_type=EventType.AGENT_REVISION,
+                message=(
+                    f"{AgentHandle.VISUAL.value} acknowledged human delegation (`{memory_id}`) "
+                    f"and is revising art direction & creatives..."
+                ),
+                payload={"memory_id": memory_id, "directive": directive},
+                trigger_mentions=False,
+            )
+
+            revised_visual = await self._dispatch_remote_visual(campaign)
+            if revised_visual is None:
+                revised_visual = await self._synthesize_fallback_visual(campaign)
+
+            rev_mem = await self.band.store_memory(
+                campaign_id=campaign_id,
+                room_id=campaign.room_id,
+                author=AgentHandle.VISUAL.value,
+                key="visual_brief_revision",
+                content=f"Revision applied ({directive}):\n{revised_visual.visual_brief_markdown}",
+                metadata={"directive_memory_id": memory_id},
+            )
+            revised_visual.band_memory_id = rev_mem.memory_id
+
+            target_status = (
+                CampaignStatus.COPY_GENERATING
+                if chain_copy
+                else CampaignStatus.AWAITING_APPROVAL
+                if campaign.request.metadata.get("require_handoff_approval")
+                and campaign.copy_output is None
+                else CampaignStatus.COMPLETED
+            )
+            await self.store.set_visual_output(campaign_id, revised_visual, status=target_status)
+            self.band.set_participant_status(campaign_id, AgentHandle.VISUAL.value, "online")
+            self.band.complete_delegation(campaign_id, AgentHandle.VISUAL.value)
+
+            await self.band.post_room_message(
+                campaign_id=campaign_id,
+                room_id=campaign.room_id,
+                sender=AgentHandle.VISUAL.value,
+                event_type=EventType.VISUAL_COMPLETED,
+                message=(
+                    f"Visual revision ready (`{rev_mem.memory_id}`) incorporating: \"{directive[:120]}\""
+                ),
+                payload={"visual_output": revised_visual.model_dump(mode="json"), "revision": True},
+                trigger_mentions=False,
+            )
+
+            if chain_copy:
+                await self._run_copy_revision(
+                    campaign_id=campaign_id,
+                    directive=f"Synchronize copy with revised visual brief ({rev_mem.memory_id}): {directive}",
+                    memory_id=rev_mem.memory_id,
+                )
+        except Exception as exc:
+            logger.exception("Visual revision failed for campaign %s", campaign_id)
+            self.band.set_participant_status(campaign_id, AgentHandle.VISUAL.value, "online")
+            await self._fail_campaign(campaign_id, campaign.room_id, AgentHandle.VISUAL.value, str(exc))
+
+    async def _run_copy_revision(
+        self,
+        *,
+        campaign_id: str,
+        directive: str,
+        memory_id: str,
+    ) -> None:
+        """Re-run `@copy_pixelate` hydrated with latest shared BAND Memories & human directive."""
+        campaign = await self.store.get_campaign(campaign_id)
+        if campaign is None:
+            return
+        try:
+            memories = await self.band.get_room_memories(campaign_id, campaign.room_id)
+            pinned_notes = "\n".join(
+                f"- [{m.key}] {m.content}" for m in memories if m.metadata.get("pinned")
+            )
+            campaign.request.additional_notes = (
+                f"{campaign.request.additional_notes or ''}\nCopy Directive: {directive}\n{pinned_notes}"
+            ).strip()[:1450]
+            campaign.status = CampaignStatus.COPY_GENERATING
+            await self.store.save_campaign(campaign)
+
+            await self.band.post_room_message(
+                campaign_id=campaign_id,
+                room_id=campaign.room_id,
+                sender=AgentHandle.COPY.value,
+                event_type=EventType.AGENT_REVISION,
+                message=(
+                    f"{AgentHandle.COPY.value} hydrated {len(memories)} shared Band Memories "
+                    f"(including `{memory_id}`) and is revising platform copy..."
+                ),
+                payload={"memory_id": memory_id, "directive": directive},
+                trigger_mentions=False,
+            )
+
+            revised_copy = await self._dispatch_remote_copy(campaign, memories)
+            if revised_copy is None:
+                revised_copy = await self._synthesize_fallback_copy(campaign, memories)
+            if memory_id not in revised_copy.band_memory_refs:
+                revised_copy.band_memory_refs.append(memory_id)
+
+            await self.handle_copy_output(campaign_id, revised_copy)
+        except Exception as exc:
+            logger.exception("Copy revision failed for campaign %s", campaign_id)
+            self.band.set_participant_status(campaign_id, AgentHandle.COPY.value, "online")
+            await self._fail_campaign(campaign_id, campaign.room_id, AgentHandle.COPY.value, str(exc))
 
     async def _fail_campaign(
         self, campaign_id: str, room_id: str, sender: str, error_msg: str

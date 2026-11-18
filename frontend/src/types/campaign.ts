@@ -31,13 +31,19 @@ export type PipelineStage =
 export type NodeStatus = "idle" | "active" | "completed" | "error";
 
 export type AgentSender =
+  | "You"
   | "System"
   | "BAND Room"
   | "@VisualAgent"
   | "@CopyAgent"
   | "Orchestrator";
 
-export type CampaignStatus = "idle" | "running" | "completed" | "error";
+export type CampaignStatus =
+  | "idle"
+  | "running"
+  | "awaiting_approval"
+  | "completed"
+  | "error";
 
 export type ConnectionMode = "live" | "mock";
 
@@ -47,6 +53,50 @@ export interface CampaignBrief {
   targetAudience: string;
   brandTone: BrandTone;
   platforms: Platform[];
+  requireHandoffApproval?: boolean;
+}
+
+export interface BandParticipant {
+  handle: string;
+  displayName: string;
+  role: string;
+  kind: "human" | "orchestrator" | "agent";
+  status: "online" | "thinking" | "working" | "awaiting_approval" | "idle";
+  framework: string;
+  skills: string[];
+  registeredRemote: boolean;
+}
+
+export interface BandSharedMemory {
+  memoryId: string;
+  roomId: string;
+  author: string;
+  key: string;
+  content: string;
+  pinned: boolean;
+  bandSynced: boolean;
+  createdAt: string;
+}
+
+export interface BandDelegationEdge {
+  edgeId: string;
+  fromHandle: string;
+  toHandle: string;
+  reason: string;
+  memoryId?: string | null;
+  status: "dispatched" | "awaiting_approval" | "completed";
+  timestamp: string;
+}
+
+export interface BandRoomState {
+  campaignId: string;
+  roomId: string;
+  transport: "band" | "local_fallback";
+  approvalRequired: boolean;
+  pendingApproval: boolean;
+  participants: BandParticipant[];
+  memories: BandSharedMemory[];
+  delegations: BandDelegationEdge[];
 }
 
 export interface DemoPreset {

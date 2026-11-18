@@ -36,7 +36,11 @@ from pydantic import BaseModel
 from shared.schemas import (
     AgentEvent,
     AgentEventInput,
+    BandApprovalInput,
     BandMemoryEntry,
+    BandMemoryInput,
+    BandMessageInput,
+    BandRoomSnapshot,
     CampaignGenerateResponse,
     CampaignRequest,
     CampaignResponse,
@@ -230,6 +234,92 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 detail=f"Campaign '{campaign_id}' not found.",
             )
         return await band.get_room_memories(campaign_id, campaign.room_id)
+
+    @app.get(
+        "/api/campaigns/{campaign_id}/band/room",
+        response_model=BandRoomSnapshot,
+        tags=["band"],
+    )
+    async def get_band_room_snapshot(campaign_id: str) -> BandRoomSnapshot:
+        """Return live BAND room snapshot: participant presence, memories, messages & delegations."""
+        campaign = await store.get_campaign(campaign_id)
+        if campaign is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Campaign '{campaign_id}' not found.",
+            )
+        return await band.build_room_snapshot(campaign)
+
+    @app.post(
+        "/api/campaigns/{campaign_id}/band/messages",
+        response_model=AgentEvent,
+        status_code=status.HTTP_201_CREATED,
+        tags=["band"],
+    )
+    async def post_band_room_message(
+        campaign_id: str, body: BandMessageInput
+    ) -> AgentEvent:
+        """Post a human message into the BAND room and route `@mention` revisions to agents."""
+        try:
+            return await coordinator.post_human_room_message(
+                campaign_id=campaign_id,
+                sender=body.sender,
+                sender_name=body.sender_name,
+                message=body.message,
+            )
+        except KeyError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+            ) from exc
+
+    @app.post(
+        "/api/campaigns/{campaign_id}/band/memories",
+        response_model=BandMemoryEntry,
+        status_code=status.HTTP_201_CREATED,
+        tags=["band"],
+    )
+    async def pin_band_room_memory(
+        campaign_id: str, body: BandMemoryInput
+    ) -> BandMemoryEntry:
+        """Pin a shared brand guideline or constraint into BAND Room Memory."""
+        try:
+            return await coordinator.pin_room_memory(
+                campaign_id=campaign_id,
+                author=body.author,
+                key=body.key,
+                content=body.content,
+                pinned=body.pinned,
+                metadata=body.metadata,
+            )
+        except KeyError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+            ) from exc
+
+    @app.post(
+        "/api/campaigns/{campaign_id}/band/approve-handoff",
+        response_model=CampaignResponse,
+        tags=["band"],
+    )
+    async def approve_band_handoff(
+        campaign_id: str, body: BandApprovalInput
+    ) -> CampaignResponse:
+        """Human-in-the-loop gate approval (or revision request) before `@copy_pixelate` runs."""
+        try:
+            return await coordinator.approve_handoff(
+                campaign_id=campaign_id,
+                approver=body.approver,
+                approved=body.approved,
+                note=body.note,
+            )
+        except KeyError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+            ) from exc
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+            ) from exc
 
     @app.get(
         "/api/campaigns/{campaign_id}/assets/{filename}",

@@ -1,10 +1,13 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ChevronRight, Layers, Palette, PenTool } from "lucide-react";
+import { ChevronRight, Layers, Palette, PenTool, Users } from "lucide-react";
 import {
   AgentEvent,
+  BandDelegationEdge,
+  BandRoomState,
+  BandSharedMemory,
   CampaignAssets,
   CampaignBrief,
   CampaignStatus,
@@ -16,14 +19,20 @@ import {
 } from "@/types/campaign";
 import { DEMO_PRESETS } from "@/data/presets";
 import {
+  approveBandHandoff,
+  buildDefaultBandRoomState,
   CampaignSessionController,
+  fetchBandRoomSnapshot,
   launchCampaignSession,
+  pinBandRoomMemory,
   requestCustomVideoCut,
+  sendBandRoomMessage,
 } from "@/lib/campaignClient";
 import { exportCampaignJson, exportCampaignZip } from "@/lib/exportKit";
 import { TopNav } from "@/components/TopNav";
 import { CampaignBriefStudio } from "@/components/CampaignBriefStudio";
 import { AgentPipelineGraph } from "@/components/AgentPipelineGraph";
+import { BandCollaborationRoom } from "@/components/BandCollaborationRoom";
 import { VisualShowcaseCard } from "@/components/VisualShowcaseCard";
 import { CopyDeckCard } from "@/components/CopyDeckCard";
 
@@ -45,6 +54,14 @@ export function CampaignWorkspace() {
   const [isRenderingCut, setIsRenderingCut] = useState(false);
   const [videoRenderError, setVideoRenderError] = useState<string | null>(null);
 
+  // BAND Shared Room live state
+  const [liveBandRoom, setLiveBandRoom] = useState<BandRoomState | null>(null);
+  const [localPinnedMemories, setLocalPinnedMemories] = useState<BandSharedMemory[]>([]);
+  const [localDelegations, setLocalDelegations] = useState<BandDelegationEdge[]>([]);
+  const [isSendingBandMsg, setIsSendingBandMsg] = useState(false);
+  const [isPinningMemory, setIsPinningMemory] = useState(false);
+  const [isApprovingHandoff, setIsApprovingHandoff] = useState(false);
+
   const controllerRef = useRef<CampaignSessionController | null>(null);
 
   useEffect(() => {
@@ -52,6 +69,25 @@ export function CampaignWorkspace() {
       controllerRef.current?.cancel();
     };
   }, []);
+
+  const isLiveBackend = resolvedMode === "live" && !preferMockMode;
+
+  const refreshLiveBandRoom = useCallback(
+    async (cid: string | null) => {
+      if (!cid || !isLiveBackend) return;
+      const snapshot = await fetchBandRoomSnapshot(cid);
+      if (snapshot) {
+        setLiveBandRoom(snapshot);
+      }
+    },
+    [isLiveBackend]
+  );
+
+  // Refresh live BAND room snapshot when events arrive or campaign status transitions
+  useEffect(() => {
+    if (!campaignId || !isLiveBackend) return;
+    void refreshLiveBandRoom(campaignId);
+  }, [campaignId, isLiveBackend, events.length, status, refreshLiveBandRoom]);
 
   const handleLaunch = useCallback(
     (overrideBrief?: CampaignBrief) => {
@@ -68,6 +104,9 @@ export function CampaignWorkspace() {
       setFinalAssets(null);
       setExtraVideos([]);
       setVideoRenderError(null);
+      setLiveBandRoom(null);
+      setLocalPinnedMemories([]);
+      setLocalDelegations([]);
       setModeNotice(null);
 
       controllerRef.current = launchCampaignSession(
@@ -85,6 +124,10 @@ export function CampaignWorkspace() {
           },
           onPartialAssets: (partial) => {
             setPartialAssets((prev) => ({ ...prev, ...partial }));
+          },
+          onApprovalRequired: () => {
+            setStatus("awaiting_approval");
+            setCurrentStage("context_handoff");
           },
           onComplete: (completeAssets) => {
             setFinalAssets(completeAssets);
@@ -152,6 +195,209 @@ export function CampaignWorkspace() {
     [campaignId]
   );
 
+  const handleSendBandMessage = useCallback(
+    async (message: string) => {
+      const cid = campaignId || `camp_room_${Date.now().toString(36)}`;
+      setIsSendingBandMsg(true);
+      const now = new Date().toISOString();
+
+      try {
+        if (isLiveBackend && campaignId) {
+          await sendBandRoomMessage(campaignId, message);
+          await refreshLiveBandRoom(campaignId);
+          return;
+        }
+
+        // Seamless interactive BAND simulation when running offline / Simulated Mode
+        const humanEvt: AgentEvent = {
+          id: `evt_human_${Date.now().toString(36)}`,
+          campaignId: cid,
+          timestamp: now,
+          stage: "band_room",
+          sender: "You",
+          type: "thought",
+          title: "Human Director Message",
+          message,
+        };
+        setEvents((prev) => [...prev, humanEvt]);
+
+        const lower = message.toLowerCase();
+        const mentionsVisual =
+          lower.includes("@visual") || lower.includes("@all");
+        const mentionsCopy = lower.includes("@copy") || lower.includes("@all");
+
+        if (mentionsVisual) {
+          const memId = `mem_dir_${Math.random().toString(36).slice(2, 7)}`;
+          setLocalPinnedMemories((prev) => [
+            ...prev,
+            {
+              memoryId: memId,
+              roomId: `room_${cid}`,
+              author: "@human_director",
+              key: "human_visual_directive",
+              content: message,
+              pinned: true,
+              bandSynced: true,
+              createdAt: now,
+            },
+          ]);
+          setLocalDelegations((prev) => [
+            ...prev,
+            {
+              edgeId: `del_vis_${Date.now().toString(36)}`,
+              fromHandle: "@human_director",
+              toHandle: "@visual_pixelate",
+              reason: message.slice(0, 120),
+              memoryId: memId,
+              status: "completed",
+              timestamp: now,
+            },
+          ]);
+          setTimeout(() => {
+            setEvents((prev) => [
+              ...prev,
+              {
+                id: `evt_vrev_${Date.now().toString(36)}`,
+                campaignId: cid,
+                timestamp: new Date().toISOString(),
+                stage: "visual_agent",
+                sender: "@VisualAgent",
+                type: "asset_ready",
+                title: "Visual Revision Applied via BAND",
+                message: `Incorporated directive (${memId}) into lighting hierarchy and updated visual brief for @copy_pixelate.`,
+              },
+            ]);
+          }, 650);
+        }
+
+        if (mentionsCopy) {
+          const memId = `mem_copy_${Math.random().toString(36).slice(2, 7)}`;
+          setLocalPinnedMemories((prev) => [
+            ...prev,
+            {
+              memoryId: memId,
+              roomId: `room_${cid}`,
+              author: "@human_director",
+              key: "human_copy_directive",
+              content: message,
+              pinned: true,
+              bandSynced: true,
+              createdAt: now,
+            },
+          ]);
+          setLocalDelegations((prev) => [
+            ...prev,
+            {
+              edgeId: `del_copy_${Date.now().toString(36)}`,
+              fromHandle: "@human_director",
+              toHandle: "@copy_pixelate",
+              reason: message.slice(0, 120),
+              memoryId: memId,
+              status: "completed",
+              timestamp: now,
+            },
+          ]);
+          setTimeout(() => {
+            setEvents((prev) => [
+              ...prev,
+              {
+                id: `evt_crev_${Date.now().toString(36)}`,
+                campaignId: cid,
+                timestamp: new Date().toISOString(),
+                stage: "copy_agent",
+                sender: "@CopyAgent",
+                type: "asset_ready",
+                title: "Copy Deck Revised via BAND Memory",
+                message: `Hydrated shared BAND memory (${memId}) and sharpened headlines, hooks, and CTA pacing across all active channels.`,
+              },
+            ]);
+          }, mentionsVisual ? 1250 : 650);
+        }
+      } finally {
+        setIsSendingBandMsg(false);
+      }
+    },
+    [campaignId, isLiveBackend, refreshLiveBandRoom]
+  );
+
+  const handlePinBandMemory = useCallback(
+    async (key: string, content: string) => {
+      const cid = campaignId || "room_preview";
+      setIsPinningMemory(true);
+      try {
+        if (isLiveBackend && campaignId) {
+          await pinBandRoomMemory(campaignId, key, content);
+          await refreshLiveBandRoom(campaignId);
+          return;
+        }
+        const entry: BandSharedMemory = {
+          memoryId: `mem_${Math.random().toString(36).slice(2, 8)}`,
+          roomId: `room_${cid}`,
+          author: "@human_director",
+          key,
+          content,
+          pinned: true,
+          bandSynced: true,
+          createdAt: new Date().toISOString(),
+        };
+        setLocalPinnedMemories((prev) => [...prev, entry]);
+        setEvents((prev) => [
+          ...prev,
+          {
+            id: `evt_mem_${Date.now().toString(36)}`,
+            campaignId: cid,
+            timestamp: entry.createdAt,
+            stage: "band_room",
+            sender: "You",
+            type: "status",
+            title: `Pinned Shared BAND Memory (${key})`,
+            message: `Pinned "${content}" as ${entry.memoryId}. Both @visual_pixelate and @copy_pixelate will enforce this rule.`,
+          },
+        ]);
+      } finally {
+        setIsPinningMemory(false);
+      }
+    },
+    [campaignId, isLiveBackend, refreshLiveBandRoom]
+  );
+
+  const handleApproveHandoff = useCallback(
+    async (approved: boolean, note?: string) => {
+      setIsApprovingHandoff(true);
+      try {
+        if (isLiveBackend && campaignId) {
+          await approveBandHandoff(campaignId, approved, note);
+          setStatus("running");
+          await refreshLiveBandRoom(campaignId);
+          return;
+        }
+
+        if (approved) {
+          setStatus("running");
+          setLocalDelegations((prev) => [
+            ...prev,
+            {
+              edgeId: `del_app_${Date.now().toString(36)}`,
+              fromHandle: "@human_director",
+              toHandle: "@copy_pixelate",
+              reason: note?.trim() || "Approved visual brief handoff",
+              status: "completed",
+              timestamp: new Date().toISOString(),
+            },
+          ]);
+          controllerRef.current?.resumeAfterApproval?.(note?.trim() || undefined);
+        } else {
+          await handleSendBandMessage(
+            `@visual_pixelate Revision requested before handoff: ${note?.trim() || "Refine contrast and focal hierarchy."}`
+          );
+        }
+      } finally {
+        setIsApprovingHandoff(false);
+      }
+    },
+    [campaignId, isLiveBackend, refreshLiveBandRoom, handleSendBandMessage]
+  );
+
   const creatives = finalAssets?.creatives ?? partialAssets.creatives ?? [];
   const baseVideos = finalAssets?.videos ?? partialAssets.videos ?? [];
   const videos = [
@@ -167,6 +413,24 @@ export function CampaignWorkspace() {
     finalAssets?.socialPosts ?? partialAssets.socialPosts ?? [];
   const metaAds = finalAssets?.metaAds ?? partialAssets.metaAds ?? [];
   const hashtags = finalAssets?.hashtags ?? partialAssets.hashtags ?? [];
+
+  const bandRoomState = useMemo<BandRoomState>(() => {
+    if (liveBandRoom) return liveBandRoom;
+    const base = buildDefaultBandRoomState(campaignId, brief, status, handoff);
+    return {
+      ...base,
+      memories: [...base.memories, ...localPinnedMemories],
+      delegations: [...base.delegations, ...localDelegations],
+    };
+  }, [
+    liveBandRoom,
+    campaignId,
+    brief,
+    status,
+    handoff,
+    localPinnedMemories,
+    localDelegations,
+  ]);
 
   const showWorkspaceBento = status !== "idle" || creatives.length > 0;
 
@@ -218,22 +482,22 @@ export function CampaignWorkspace() {
             >
               <div className="mx-auto max-w-3xl text-center">
                 <p className="text-[13px] font-semibold tracking-[-0.01em] text-[#0071E3]">
-                  Agent Pixelate Studio
+                  Agent Pixelate · Powered by BAND
                 </p>
 
                 <h2 className="mt-3 text-3xl font-semibold leading-[1.08] tracking-[-0.032em] text-[#1D1D1F] sm:text-5xl">
-                  Two agents.
+                  Two agents. One room.
                   <br />
-                  One effortless campaign.
+                  Total creative control.
                 </h2>
 
                 <p className="mx-auto mt-5 max-w-2xl text-[15px] leading-relaxed text-[#6E6E73] sm:text-[17px]">
-                  <span className="font-medium text-[#1D1D1F]">@VisualAgent</span>{" "}
+                  Work directly alongside{" "}
+                  <span className="font-medium text-[#1D1D1F]">@visual_pixelate</span>{" "}
                   and{" "}
-                  <span className="font-medium text-[#1D1D1F]">@CopyAgent</span>{" "}
-                  collaborate in a shared BAND room—turning a single product brief
-                  into cohesive art direction, multi-aspect visuals, and
-                  platform-native copy.
+                  <span className="font-medium text-[#1D1D1F]">@copy_pixelate</span>{" "}
+                  inside a live BAND shared room—delegate via @mentions, pin shared
+                  brand guardrails into memory, and approve handoffs in real time.
                 </p>
 
                 <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
@@ -291,6 +555,10 @@ export function CampaignWorkspace() {
               {/* Restrained Feature Spec Row */}
               <div className="mx-auto mt-10 flex max-w-3xl flex-wrap items-center justify-center gap-x-8 gap-y-3 border-t border-black/[0.06] pt-7 text-[12px] font-medium text-[#6E6E73]">
                 <span className="inline-flex items-center gap-2">
+                  <Users className="h-4 w-4 text-[#1D1D1F]" />
+                  Live BAND Room &amp; Shared Memory
+                </span>
+                <span className="inline-flex items-center gap-2">
                   <Palette className="h-4 w-4 text-[#1D1D1F]" />
                   3 Aspect Creatives &amp; MP4 Video Studio
                 </span>
@@ -305,39 +573,55 @@ export function CampaignWorkspace() {
               </div>
             </motion.section>
           ) : (
-            /* Campaign Asset Bento Grid */
-            <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-              <div className="xl:col-span-7">
-                <VisualShowcaseCard
-                  campaignId={campaignId}
-                  brief={brief}
-                  creatives={creatives}
-                  videos={videos}
-                  palette={palette}
-                  artDirectionSummary={artDirectionSummary}
-                  storyboard={storyboard}
-                  isLoading={status === "running"}
-                  isLiveBackend={resolvedMode === "live" && !preferMockMode}
-                  isRenderingCut={isRenderingCut}
-                  renderError={videoRenderError}
-                  onRenderCustomCut={handleRenderCustomCut}
-                />
-              </div>
-              <div className="xl:col-span-5">
-                <CopyDeckCard
-                  assets={finalAssets}
-                  socialPosts={socialPosts}
-                  metaAds={metaAds}
-                  hashtags={hashtags}
-                  creatives={creatives}
-                  selectedPlatforms={brief.platforms}
-                  isLoading={status === "running"}
-                  onExportJson={handleExportJson}
-                  onExportZip={handleExportZip}
-                  isExportingZip={isExportingZip}
-                />
-              </div>
-            </section>
+            <div className="space-y-6">
+              {/* Interactive BAND Shared Collaboration Room (Chat, Memory Vault, Approval Gate, Delegations) */}
+              <BandCollaborationRoom
+                roomState={bandRoomState}
+                events={events}
+                status={status}
+                isLiveBackend={isLiveBackend}
+                isSendingMessage={isSendingBandMsg}
+                isPinningMemory={isPinningMemory}
+                isApproving={isApprovingHandoff}
+                onSendMessage={handleSendBandMessage}
+                onPinMemory={handlePinBandMemory}
+                onApproveHandoff={handleApproveHandoff}
+              />
+
+              {/* Campaign Asset Bento Grid */}
+              <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+                <div className="xl:col-span-7">
+                  <VisualShowcaseCard
+                    campaignId={campaignId}
+                    brief={brief}
+                    creatives={creatives}
+                    videos={videos}
+                    palette={palette}
+                    artDirectionSummary={artDirectionSummary}
+                    storyboard={storyboard}
+                    isLoading={status === "running"}
+                    isLiveBackend={isLiveBackend}
+                    isRenderingCut={isRenderingCut}
+                    renderError={videoRenderError}
+                    onRenderCustomCut={handleRenderCustomCut}
+                  />
+                </div>
+                <div className="xl:col-span-5">
+                  <CopyDeckCard
+                    assets={finalAssets}
+                    socialPosts={socialPosts}
+                    metaAds={metaAds}
+                    hashtags={hashtags}
+                    creatives={creatives}
+                    selectedPlatforms={brief.platforms}
+                    isLoading={status === "running"}
+                    onExportJson={handleExportJson}
+                    onExportZip={handleExportZip}
+                    isExportingZip={isExportingZip}
+                  />
+                </div>
+              </section>
+            </div>
           )}
         </main>
       </div>
