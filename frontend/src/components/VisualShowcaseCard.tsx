@@ -18,26 +18,48 @@ import {
   Volume2,
 } from "lucide-react";
 import {
+  CampaignBrief,
+  CampaignVideoAsset,
   ColorSwatch,
   StoryboardFrame,
+  VideoAspectRatio,
+  VideoShotStyle,
   VisualCreative,
 } from "@/types/campaign";
 import { cn, copyTextToClipboard } from "@/lib/utils";
+import { VideoStudioPlayer } from "@/components/VideoStudioPlayer";
 
 interface VisualShowcaseCardProps {
+  campaignId: string | null;
+  brief: CampaignBrief;
   creatives: VisualCreative[];
+  videos: CampaignVideoAsset[];
   palette: ColorSwatch[];
   artDirectionSummary: string;
   storyboard: StoryboardFrame[];
   isLoading: boolean;
+  isLiveBackend: boolean;
+  isRenderingCut: boolean;
+  renderError: string | null;
+  onRenderCustomCut: (
+    aspectRatio: VideoAspectRatio,
+    shotStyle: VideoShotStyle
+  ) => void;
 }
 
 export function VisualShowcaseCard({
+  campaignId,
+  brief,
   creatives,
+  videos,
   palette,
   artDirectionSummary,
   storyboard,
   isLoading,
+  isLiveBackend,
+  isRenderingCut,
+  renderError,
+  onRenderCustomCut,
 }: VisualShowcaseCardProps) {
   const [activeTab, setActiveTab] = useState<"creatives" | "storyboard">(
     "creatives"
@@ -133,7 +155,12 @@ export function VisualShowcaseCard({
             )}
           >
             <Film className="h-3.5 w-3.5" />
-            <span>Storyboard</span>
+            <span>Video Studio</span>
+            {videos.length > 0 && (
+              <span className="rounded-full bg-[#248A3D]/12 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-[#1D6F31]">
+                MP4
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -351,89 +378,75 @@ export function VisualShowcaseCard({
               </div>
             </>
           ) : (
-            /* Video Storyboard Tab */
-            <div className="space-y-4">
-              {activeScene && (
-                <div className="overflow-hidden rounded-[18px] border border-black/[0.08] bg-[#1D1D1F]">
-                  {/* Cinema Preview Frame */}
-                  <div className="relative flex aspect-[16/9] flex-col justify-between overflow-hidden p-6">
-                    <motion.div
-                      key={activeScene.id}
-                      initial={{ scale: 1.06, opacity: 0.4 }}
-                      animate={{
-                        scale: isPlayingMotion ? 1.0 : 1.02,
-                        opacity: 0.78,
-                      }}
-                      transition={{ duration: 2.2, ease: "easeOut" }}
-                      className="pointer-events-none absolute inset-0"
-                      style={{
-                        background: `radial-gradient(circle at 72% 32%, ${activeScene.accentHex}66, transparent 58%), radial-gradient(circle at 24% 82%, ${activeScene.secondaryHex}44, transparent 55%), linear-gradient(135deg, #111113 0%, #1D1D1F 100%)`,
-                      }}
-                    />
+            /* Video Studio (Real MP4 / Live 60fps Canvas) + Director Storyboard */
+            <div className="space-y-5">
+              <VideoStudioPlayer
+                campaignId={campaignId}
+                brief={brief}
+                palette={palette}
+                videos={videos}
+                isLiveBackend={isLiveBackend}
+                isRenderingCut={isRenderingCut}
+                renderError={renderError}
+                onRenderCustomCut={onRenderCustomCut}
+              />
 
-                    {/* Top Bar */}
-                    <div className="relative z-10 flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[11px] font-medium text-white backdrop-blur-md">
-                        <Clapperboard className="h-3.5 w-3.5" />
-                        Scene 0{activeScene.sceneNumber} · {activeScene.timecode}
+              {/* Interactive Director's Storyboard Breakdown */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] font-semibold tracking-[-0.01em] text-[#1D1D1F]">
+                    Director&apos;s Storyboard (4 Continuous Beats)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsPlayingMotion((p) => !p)}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[#F5F5F7] px-3 py-1 text-[11px] font-medium text-[#0066CC] transition hover:bg-black/[0.06]"
+                  >
+                    {isPlayingMotion ? (
+                      <>
+                        <Pause className="h-3 w-3" />
+                        <span>Pause Beats</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-3 w-3 fill-current" />
+                        <span>Cycle Beats</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {activeScene && (
+                  <div className="rounded-2xl bg-[#F5F5F7] p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#1D1D1F]">
+                        <Clapperboard className="h-3.5 w-3.5 text-[#0071E3]" />
+                        Scene 0{activeScene.sceneNumber} · {activeScene.timecode} · {activeScene.title}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => setIsPlayingMotion((p) => !p)}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-[12px] font-medium text-[#1D1D1F] shadow-sm transition hover:bg-white/90"
-                      >
-                        {isPlayingMotion ? (
-                          <>
-                            <Pause className="h-3.5 w-3.5" />
-                            <span>Pause</span>
-                          </>
-                        ) : (
-                          <>
-                            <Play className="h-3.5 w-3.5 fill-current" />
-                            <span>Play Preview</span>
-                          </>
-                        )}
-                      </button>
+                      <span className="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-medium text-[#6E6E73] shadow-sm">
+                        {activeScene.captionOverlay}
+                      </span>
                     </div>
-
-                    {/* Center Kinetic Super */}
-                    <AnimatePresence mode="wait">
-                      <motion.div
-                        key={activeScene.id}
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.28 }}
-                        className="relative z-10 my-auto max-w-xl"
-                      >
-                        <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-white/70">
-                          {activeScene.title}
-                        </div>
-                        <div className="mt-2 text-2xl font-semibold tracking-[-0.025em] text-white sm:text-3xl">
-                          {activeScene.captionOverlay}
-                        </div>
-                        <p className="mt-2 text-[13px] leading-relaxed text-white/80">
-                          {activeScene.visualDirection}
-                        </p>
-                      </motion.div>
-                    </AnimatePresence>
-
-                    {/* Camera & Audio Cues */}
-                    <div className="relative z-10 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      <div className="flex items-center gap-2 rounded-xl bg-black/45 px-3 py-2 text-[11px] text-white/90 backdrop-blur-md">
-                        <Camera className="h-3.5 w-3.5 shrink-0 text-white/75" />
+                    <p className="mt-2 text-[13px] leading-relaxed text-[#424245]">
+                      {activeScene.visualDirection}
+                    </p>
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <div className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-[11px] font-medium text-[#1D1D1F] shadow-sm">
+                        <Camera className="h-3.5 w-3.5 shrink-0 text-[#6E6E73]" />
                         <span className="truncate">{activeScene.cameraMove}</span>
                       </div>
-                      <div className="flex items-center gap-2 rounded-xl bg-black/45 px-3 py-2 text-[11px] text-white/90 backdrop-blur-md">
-                        <Volume2 className="h-3.5 w-3.5 shrink-0 text-white/75" />
+                      <div className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-[11px] font-medium text-[#1D1D1F] shadow-sm">
+                        <Volume2 className="h-3.5 w-3.5 shrink-0 text-[#6E6E73]" />
                         <span className="truncate">{activeScene.audioCue}</span>
                       </div>
                     </div>
                   </div>
+                )}
 
-                  {/* Clean Scrubbable Progress Bar */}
-                  <div className="grid grid-cols-4 gap-1.5 bg-[#151517] p-2.5">
-                    {storyboard.map((frame, idx) => (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {storyboard.map((frame, idx) => {
+                    const selected = idx === activeSceneIndex;
+                    return (
                       <button
                         key={frame.id}
                         type="button"
@@ -441,54 +454,29 @@ export function VisualShowcaseCard({
                           setActiveSceneIndex(idx);
                           setIsPlayingMotion(false);
                         }}
-                        className="group py-1 text-left"
+                        className={cn(
+                          "rounded-2xl border p-4 text-left transition",
+                          selected
+                            ? "border-[#0071E3] bg-[#0071E3]/[0.05]"
+                            : "border-black/[0.06] bg-[#F5F5F7] hover:border-black/[0.15]"
+                        )}
                       >
-                        <div className="h-1 overflow-hidden rounded-full bg-white/20">
-                          <div
-                            className="h-full rounded-full bg-white transition-all duration-300"
-                            style={{ width: idx <= activeSceneIndex ? "100%" : "0%" }}
-                          />
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-mono font-medium text-[#0066CC]">
+                            0{frame.sceneNumber} · {frame.timecode}
+                          </span>
+                          <span className="text-[#86868B]">{frame.durationSec}s</span>
                         </div>
+                        <div className="mt-1.5 text-[13px] font-semibold text-[#1D1D1F]">
+                          {frame.title}
+                        </div>
+                        <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-[#6E6E73]">
+                          {frame.visualDirection}
+                        </p>
                       </button>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
-              )}
-
-              {/* Scene Selector Grid */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {storyboard.map((frame, idx) => {
-                  const selected = idx === activeSceneIndex;
-                  return (
-                    <button
-                      key={frame.id}
-                      type="button"
-                      onClick={() => {
-                        setActiveSceneIndex(idx);
-                        setIsPlayingMotion(false);
-                      }}
-                      className={cn(
-                        "rounded-2xl border p-4 text-left transition",
-                        selected
-                          ? "border-[#0071E3] bg-[#0071E3]/[0.05]"
-                          : "border-black/[0.06] bg-[#F5F5F7] hover:border-black/[0.15]"
-                      )}
-                    >
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="font-mono font-medium text-[#0066CC]">
-                          0{frame.sceneNumber} · {frame.timecode}
-                        </span>
-                        <span className="text-[#86868B]">{frame.durationSec}s</span>
-                      </div>
-                      <div className="mt-1.5 text-[13px] font-semibold text-[#1D1D1F]">
-                        {frame.title}
-                      </div>
-                      <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-[#6E6E73]">
-                        {frame.visualDirection}
-                      </p>
-                    </button>
-                  );
-                })}
               </div>
             </div>
           )}

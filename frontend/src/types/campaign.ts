@@ -2,6 +2,24 @@ export type BrandTone = "Bold" | "Minimalist" | "Luxury" | "Playful";
 
 export type Platform = "Instagram" | "LinkedIn" | "Meta Ads";
 
+export type VideoShotStyle =
+  | "obsidian_cinema"
+  | "kinetic_type"
+  | "luxury_editorial"
+  | "pulse_drop";
+
+export type VideoAspectRatio = "16:9" | "9:16";
+
+export interface CampaignVideoAsset {
+  id: string;
+  title: string;
+  videoUrl: string;
+  aspectRatio: VideoAspectRatio;
+  shotStyle: VideoShotStyle;
+  durationSec: number;
+  promptSummary: string;
+}
+
 export type PipelineStage =
   | "user_brief"
   | "band_room"
@@ -113,6 +131,7 @@ export interface CampaignAssets {
   artDirectionSummary: string;
   palette: ColorSwatch[];
   creatives: VisualCreative[];
+  videos: CampaignVideoAsset[];
   storyboard: StoryboardFrame[];
   handoff: ContextHandoffPayload | null;
   socialPosts: SocialPost[];

@@ -8,13 +8,17 @@ import {
   CampaignAssets,
   CampaignBrief,
   CampaignStatus,
+  CampaignVideoAsset,
   ConnectionMode,
   PipelineStage,
+  VideoAspectRatio,
+  VideoShotStyle,
 } from "@/types/campaign";
 import { DEMO_PRESETS } from "@/data/presets";
 import {
   CampaignSessionController,
   launchCampaignSession,
+  requestCustomVideoCut,
 } from "@/lib/campaignClient";
 import { exportCampaignJson, exportCampaignZip } from "@/lib/exportKit";
 import { TopNav } from "@/components/TopNav";
@@ -37,6 +41,9 @@ export function CampaignWorkspace() {
   const [finalAssets, setFinalAssets] = useState<CampaignAssets | null>(null);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [isExportingZip, setIsExportingZip] = useState(false);
+  const [extraVideos, setExtraVideos] = useState<CampaignVideoAsset[]>([]);
+  const [isRenderingCut, setIsRenderingCut] = useState(false);
+  const [videoRenderError, setVideoRenderError] = useState<string | null>(null);
 
   const controllerRef = useRef<CampaignSessionController | null>(null);
 
@@ -59,6 +66,8 @@ export function CampaignWorkspace() {
       setCurrentStage("user_brief");
       setPartialAssets({});
       setFinalAssets(null);
+      setExtraVideos([]);
+      setVideoRenderError(null);
       setModeNotice(null);
 
       controllerRef.current = launchCampaignSession(
@@ -108,13 +117,47 @@ export function CampaignWorkspace() {
     if (!finalAssets) return;
     setIsExportingZip(true);
     try {
-      await exportCampaignZip(finalAssets);
+      const mergedVideos = [
+        ...(finalAssets.videos ?? []),
+        ...extraVideos.filter(
+          (ev) => !(finalAssets.videos ?? []).some((v) => v.id === ev.id)
+        ),
+      ];
+      await exportCampaignZip({ ...finalAssets, videos: mergedVideos });
     } finally {
       setIsExportingZip(false);
     }
-  }, [finalAssets]);
+  }, [finalAssets, extraVideos]);
+
+  const handleRenderCustomCut = useCallback(
+    async (aspectRatio: VideoAspectRatio, shotStyle: VideoShotStyle) => {
+      if (!campaignId) return;
+      setIsRenderingCut(true);
+      setVideoRenderError(null);
+      try {
+        const newVideo = await requestCustomVideoCut(
+          campaignId,
+          aspectRatio,
+          shotStyle
+        );
+        setExtraVideos((prev) => [...prev, newVideo]);
+      } catch (err) {
+        setVideoRenderError(
+          err instanceof Error ? err.message : "Failed to render MP4 cut."
+        );
+      } finally {
+        setIsRenderingCut(false);
+      }
+    },
+    [campaignId]
+  );
 
   const creatives = finalAssets?.creatives ?? partialAssets.creatives ?? [];
+  const baseVideos = finalAssets?.videos ?? partialAssets.videos ?? [];
+  const videos = [
+    ...baseVideos,
+    ...extraVideos.filter((ev) => !baseVideos.some((v) => v.id === ev.id)),
+  ];
   const palette = finalAssets?.palette ?? partialAssets.palette ?? [];
   const storyboard = finalAssets?.storyboard ?? partialAssets.storyboard ?? [];
   const artDirectionSummary =
@@ -249,7 +292,7 @@ export function CampaignWorkspace() {
               <div className="mx-auto mt-10 flex max-w-3xl flex-wrap items-center justify-center gap-x-8 gap-y-3 border-t border-black/[0.06] pt-7 text-[12px] font-medium text-[#6E6E73]">
                 <span className="inline-flex items-center gap-2">
                   <Palette className="h-4 w-4 text-[#1D1D1F]" />
-                  3 Aspect Creatives &amp; 15s Storyboard
+                  3 Aspect Creatives &amp; MP4 Video Studio
                 </span>
                 <span className="inline-flex items-center gap-2">
                   <PenTool className="h-4 w-4 text-[#1D1D1F]" />
@@ -266,11 +309,18 @@ export function CampaignWorkspace() {
             <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
               <div className="xl:col-span-7">
                 <VisualShowcaseCard
+                  campaignId={campaignId}
+                  brief={brief}
                   creatives={creatives}
+                  videos={videos}
                   palette={palette}
                   artDirectionSummary={artDirectionSummary}
                   storyboard={storyboard}
                   isLoading={status === "running"}
+                  isLiveBackend={resolvedMode === "live" && !preferMockMode}
+                  isRenderingCut={isRenderingCut}
+                  renderError={videoRenderError}
+                  onRenderCustomCut={handleRenderCustomCut}
                 />
               </div>
               <div className="xl:col-span-5">

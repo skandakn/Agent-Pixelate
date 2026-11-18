@@ -30,7 +30,9 @@ from orchestrator.band_client import BandAdapter
 from orchestrator.config import Settings, get_settings
 from orchestrator.event_bus import AsyncEventBus
 from orchestrator.storage import CampaignStore
+from orchestrator.video_renderer import AspectRatio, ShotStyle
 from orchestrator.workflow import CampaignCoordinator
+from pydantic import BaseModel
 from shared.schemas import (
     AgentEvent,
     AgentEventInput,
@@ -40,9 +42,17 @@ from shared.schemas import (
     CampaignResponse,
     CopyOutput,
     EventType,
+    VisualAsset,
     VisualOutput,
     utc_now,
 )
+
+
+class VideoRenderRequest(BaseModel):
+    """On-demand video cut generation request."""
+
+    aspect_ratio: AspectRatio = "16:9"
+    shot_style: ShotStyle = "obsidian_cinema"
 
 logger = logging.getLogger("agent_pixelate.orchestrator")
 
@@ -229,11 +239,38 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 detail=f"Asset '{filename}' not found for campaign '{campaign_id}'.",
             )
         media_type, _ = mimetypes.guess_type(str(asset_path))
+        if asset_path.suffix.lower() == ".mp4":
+            media_type = "video/mp4"
         return FileResponse(
             path=asset_path,
             media_type=media_type or "application/octet-stream",
             filename=asset_path.name,
         )
+
+    @app.post(
+        "/api/campaigns/{campaign_id}/video",
+        response_model=VisualAsset,
+        status_code=status.HTTP_201_CREATED,
+        tags=["assets"],
+    )
+    async def render_campaign_video(
+        campaign_id: str, body: VideoRenderRequest
+    ) -> VisualAsset:
+        """Render an on-demand cinematic H.264 MP4 cut (16:9 or 9:16) with shot recipes."""
+        try:
+            return await coordinator.render_campaign_video(
+                campaign_id,
+                aspect_ratio=body.aspect_ratio,
+                shot_style=body.shot_style,
+            )
+        except KeyError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+            ) from exc
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+            ) from exc
 
     @app.post(
         "/api/campaigns/{campaign_id}/callbacks/visual",

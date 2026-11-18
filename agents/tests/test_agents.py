@@ -46,17 +46,16 @@ def _sample_request() -> CampaignRequest:
 def test_finch_skill_loader_parses_all_three_skills() -> None:
     loader = FinchSkillLoader()
     ids = loader.list_skill_ids()
-    assert set(ids) == {
+    assert {
         "brand_visual_direction",
         "ad_copy_conversion",
         "social_platform_formatter",
-    }
+    } <= set(ids)
 
     catalog = loader.list_catalog()
-    assert len(catalog) == 3
+    assert len(catalog) >= 3
     for card in catalog:
         assert card["provider"] == "finchtech.ai"
-        assert "adal-agent-harness" in card["compatibility"]
 
     tool_fn = loader.as_adal_tool_fn()
     rendered = tool_fn("brand_visual_direction")

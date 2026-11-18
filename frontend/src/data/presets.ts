@@ -436,6 +436,7 @@ export function buildSimulatedCampaignAssets(
     artDirectionSummary: `${tone} Obsidian-canvas visual language pairing high-contrast macro lighting (${primaryHex} & ${accentHex}) with crisp editorial copy engineered for ${audience}.`,
     palette,
     creatives,
+    videos: [],
     storyboard,
     handoff,
     socialPosts,

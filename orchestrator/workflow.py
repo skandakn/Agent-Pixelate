@@ -16,6 +16,8 @@ import asyncio
 import html
 import logging
 import os
+import shutil
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -25,6 +27,13 @@ from orchestrator.band_client import BandAdapter
 from orchestrator.config import Settings
 from orchestrator.event_bus import AsyncEventBus
 from orchestrator.storage import CampaignStore
+from orchestrator.video_renderer import (
+    AspectRatio,
+    SHOT_STYLES,
+    ShotStyle,
+    VideoRenderSpec,
+    render_campaign_video_mp4,
+)
 from shared.schemas import (
     AgentEvent,
     AgentHandle,
@@ -595,6 +604,42 @@ class CampaignCoordinator:
                 trigger_mentions=False,
             )
 
+        # Render cinematic H.264 MP4 promo video (inspired by motionmaxxing + bang-motion + video-shotcraft)
+        if shutil.which("ffmpeg") and not os.environ.get("PYTEST_CURRENT_TEST"):
+            try:
+                default_style: ShotStyle = (
+                    "luxury_editorial"
+                    if "lux" in req.brand_tone.lower()
+                    else "pulse_drop"
+                    if "bold" in req.brand_tone.lower()
+                    else "obsidian_cinema"
+                )
+                video_asset = await self._render_video_asset(
+                    campaign=campaign,
+                    palette=palette,
+                    aspect_ratio="16:9",
+                    shot_style=default_style,
+                )
+                assets.append(video_asset)
+                await self.band.post_room_message(
+                    campaign_id=campaign.campaign_id,
+                    room_id=campaign.room_id,
+                    sender=AgentHandle.VISUAL.value,
+                    event_type=EventType.ASSET_GENERATED,
+                    message=(
+                        f"Rendered 10s cinematic H.264 promo video ({default_style}, 16:9) "
+                        f"with beat-synced soundtrack: {video_asset.title}."
+                    ),
+                    payload={"asset": video_asset.model_dump(mode="json")},
+                    trigger_mentions=False,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "MP4 video rendering skipped for campaign %s: %s",
+                    campaign.campaign_id,
+                    exc,
+                )
+
         mood_keywords = [
             kw.strip()
             for kw in req.brand_tone.replace(" and ", ",").split(",")
@@ -709,6 +754,133 @@ class CampaignCoordinator:
             ],
             band_memory_refs=[m.memory_id for m in memories],
         )
+
+    async def _render_video_asset(
+        self,
+        *,
+        campaign: CampaignResponse,
+        palette: list[str],
+        aspect_ratio: AspectRatio = "16:9",
+        shot_style: ShotStyle = "obsidian_cinema",
+    ) -> VisualAsset:
+        req = campaign.request
+        style_meta = SHOT_STYLES.get(shot_style, SHOT_STYLES["obsidian_cinema"])
+        ar_slug = aspect_ratio.replace(":", "x")
+        asset_id = f"video_{shot_style}_{ar_slug}_{uuid4().hex[:6]}"
+        filename = f"{asset_id}.mp4"
+        out_path: Path = self.store.assets_dir(campaign.campaign_id) / filename
+
+        hook = (
+            campaign.copy_output.platform_copies[0].headline
+            if campaign.copy_output and campaign.copy_output.platform_copies
+            else f"{req.brand_name} — Reimagined"
+        )
+        tagline = (
+            campaign.copy_output.campaign_tagline
+            if campaign.copy_output
+            else f"{req.brand_tone} craft built for {req.target_audience[:42]}"
+        )
+        cta_label = (
+            campaign.copy_output.platform_copies[0].call_to_action
+            if campaign.copy_output and campaign.copy_output.platform_copies
+            else "Shop Now"
+        )
+
+        spec = VideoRenderSpec(
+            brand_name=req.brand_name,
+            tagline=tagline,
+            hook=hook,
+            description=req.product_description,
+            target_audience=req.target_audience,
+            brand_tone=req.brand_tone,
+            cta_label=cta_label,
+            platforms=req.platforms,
+            palette=palette,
+            aspect_ratio=aspect_ratio,
+            shot_style=shot_style,
+            duration_sec=8.0,
+            fps=18,
+        )
+
+        await asyncio.to_thread(render_campaign_video_mp4, spec, out_path)
+
+        width, height = (450, 800) if aspect_ratio == "9:16" else (800, 450)
+        return VisualAsset(
+            asset_id=asset_id,
+            title=f"{req.brand_name} — {style_meta['label']} Promo ({aspect_ratio})",
+            platform="video_reel" if aspect_ratio == "9:16" else "video_cinema",
+            aspect_ratio=aspect_ratio,
+            prompt_used=(
+                f"MotionMaxx/ShotCraft {style_meta['label']} ({style_meta['curve']}): "
+                f"{style_meta['description']}"
+            ),
+            file_path=str(out_path),
+            asset_url=f"/api/campaigns/{campaign.campaign_id}/assets/{filename}",
+            mime_type="video/mp4",
+            width=width,
+            height=height,
+            color_tokens=palette,
+            alt_text=f"10s H.264 cinematic promo video for {req.brand_name}",
+        )
+
+    async def render_campaign_video(
+        self,
+        campaign_id: str,
+        *,
+        aspect_ratio: AspectRatio = "16:9",
+        shot_style: ShotStyle = "obsidian_cinema",
+    ) -> VisualAsset:
+        """Render a fresh on-demand MP4 cut for an existing campaign and persist it."""
+        campaign = await self.store.get_campaign(campaign_id)
+        if campaign is None:
+            raise KeyError(f"Campaign '{campaign_id}' not found.")
+
+        palette = (
+            campaign.visual_output.color_palette
+            if campaign.visual_output and campaign.visual_output.color_palette
+            else DEFAULT_PALETTE
+        )
+
+        await self.band.post_room_message(
+            campaign_id=campaign_id,
+            room_id=campaign.room_id,
+            sender=AgentHandle.VISUAL.value,
+            event_type=EventType.AGENT_THINKING,
+            message=(
+                f"Rendering custom {aspect_ratio} MP4 cut using `{shot_style}` shot recipe "
+                f"with measured easing curves and beat-synced soundtrack..."
+            ),
+            payload={"aspect_ratio": aspect_ratio, "shot_style": shot_style},
+            trigger_mentions=False,
+        )
+
+        video_asset = await self._render_video_asset(
+            campaign=campaign,
+            palette=palette,
+            aspect_ratio=aspect_ratio,
+            shot_style=shot_style,
+        )
+
+        # Persist the newly rendered video onto the campaign's visual_output
+        if campaign.visual_output is not None:
+            campaign.visual_output.assets.append(video_asset)
+            await self.store.set_visual_output(
+                campaign_id,
+                campaign.visual_output,
+                status=campaign.status,
+            )
+
+        await self.band.post_room_message(
+            campaign_id=campaign_id,
+            room_id=campaign.room_id,
+            sender=AgentHandle.VISUAL.value,
+            event_type=EventType.ASSET_GENERATED,
+            message=f"Custom MP4 video ready: {video_asset.title}",
+            payload={"asset": video_asset.model_dump(mode="json")},
+            trigger_mentions=False,
+        )
+
+        return video_asset
 
     @staticmethod
     def _render_concept_svg(

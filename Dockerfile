@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# Agent Pixelate Full-Stack Container (Next.js Static Studio + FastAPI BAND Orchestrator)
+# Agent Pixelate Full-Stack Container (Next.js Static Studio + FastAPI BAND Orchestrator + FFmpeg Video Engine)
 # Compatible with Render, Docker, and Agent37 Cloud Sandboxes (non-root user)
 
 # --- Stage 1: Build Next.js 14 Static Frontend Studio ---
@@ -13,7 +13,7 @@ RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-# --- Stage 2: FastAPI Orchestrator + Served Static Frontend ---
+# --- Stage 2: FastAPI Orchestrator + FFmpeg Video Renderer + Served Static Frontend ---
 FROM python:3.11-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -27,6 +27,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     ORCHESTRATOR_PORT=8000 \
     PORT=8000 \
     AGENT37_RUNTIME=gvisor
+
+# Install ffmpeg + DejaVu TrueType fonts for cinematic MP4 video rendering
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user and persistent campaign volume mountpoint
 RUN groupadd --gid 1000 pixelate \
