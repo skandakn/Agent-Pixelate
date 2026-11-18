@@ -9,8 +9,8 @@ __pycache__
 *.pyc
 .pytest_cache
 data
-frontend
-agents
-node_modules
-.next
-tests
+**/node_modules
+**/.next
+**/out
+orchestrator/tests
+agents/tests

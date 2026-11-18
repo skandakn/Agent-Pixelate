@@ -18,11 +18,13 @@ import mimetypes
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from orchestrator.band_client import BandAdapter
 from orchestrator.config import Settings, get_settings
@@ -379,6 +381,60 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             reader_task.cancel()
             await asyncio.gather(reader_task, return_exceptions=True)
+
+    # Serve compiled Next.js static export (`frontend/out`) when available
+    frontend_dist_candidates = [
+        Path(os.environ["FRONTEND_DIST_DIR"])
+        if os.environ.get("FRONTEND_DIST_DIR")
+        else None,
+        Path("/app/frontend/out"),
+        Path(__file__).resolve().parent.parent / "frontend" / "out",
+    ]
+    frontend_dist = next(
+        (p for p in frontend_dist_candidates if p is not None and (p / "index.html").is_file()),
+        None,
+    )
+
+    if frontend_dist is not None:
+        next_assets_dir = frontend_dist / "_next"
+        if next_assets_dir.is_dir():
+            app.mount(
+                "/_next",
+                StaticFiles(directory=str(next_assets_dir)),
+                name="frontend_next_assets",
+            )
+
+        @app.get("/", include_in_schema=False)
+        async def serve_frontend_root() -> FileResponse:
+            return FileResponse(frontend_dist / "index.html")
+
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def serve_frontend_static(full_path: str) -> FileResponse:
+            if full_path.startswith(("api/", "ws/", "health", "docs", "redoc", "openapi.json")):
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
+
+            candidate = (frontend_dist / full_path).resolve()
+            try:
+                candidate.relative_to(frontend_dist.resolve())
+            except ValueError as exc:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found") from exc
+
+            if candidate.is_file():
+                return FileResponse(candidate)
+            if (candidate / "index.html").is_file():
+                return FileResponse(candidate / "index.html")
+            return FileResponse(frontend_dist / "index.html")
+    else:
+        @app.get("/", tags=["system"])
+        async def root_status() -> dict[str, Any]:
+            return {
+                "service": cfg.app_name,
+                "version": cfg.app_version,
+                "status": "ok",
+                "docs_url": "/docs",
+                "health_url": "/health",
+                "generate_url": "/api/campaigns/generate",
+            }
 
     return app
 

@@ -121,9 +121,20 @@ export function TopNav({
             {preferMockMode ? (
               <WifiOff className="h-3.5 w-3.5 text-amber-400" />
             ) : (
-              <Wifi className="h-3.5 w-3.5 text-cyan-400" />
+              <Wifi
+                className={cn(
+                  "h-3.5 w-3.5",
+                  isLive ? "text-emerald-400" : "text-cyan-400"
+                )}
+              />
             )}
-            <span>{preferMockMode ? "Mock Mode: ON" : "Auto Live / Fallback"}</span>
+            <span>
+              {preferMockMode
+                ? "Mock Mode: ON"
+                : isLive
+                  ? "Live API Connected"
+                  : "Live API · Auto Fallback"}
+            </span>
           </button>
 
           {assets && (
