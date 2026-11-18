@@ -9,6 +9,7 @@ import "@fontsource/jetbrains-mono/500.css";
 import "@fontsource/jetbrains-mono/600.css";
 import "@fontsource/jetbrains-mono/700.css";
 import "./globals.css";
+import { ClerkAuthProvider } from "@/components/ClerkAuthProvider";
 
 export const metadata: Metadata = {
   title: "Agent Pixelate — Multi-Agent AI Marketing Campaign Studio",
@@ -24,7 +25,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="min-h-screen bg-[#09090B] font-sans text-zinc-100 antialiased">
-        {children}
+        <ClerkAuthProvider>{children}</ClerkAuthProvider>
       </body>
     </html>
   );
