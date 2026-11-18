@@ -985,7 +985,7 @@ class CampaignCoordinator:
                         "responseMimeType": "application/json",
                     },
                 },
-                timeout=30.0,
+                timeout=10.0,
             )
             if resp.status_code >= 400:
                 logger.warning("Gemini JSON call (%s) HTTP %s: %s", model, resp.status_code, resp.text[:200])
@@ -1023,7 +1023,7 @@ class CampaignCoordinator:
                     "contents": [{"parts": [{"text": prompt}]}],
                     "generationConfig": {"responseModalities": ["IMAGE"]},
                 },
-                timeout=40.0,
+                timeout=14.0,
             )
             if resp.status_code >= 400:
                 logger.warning("Gemini image call (%s) HTTP %s", model, resp.status_code)
@@ -1100,14 +1100,16 @@ class CampaignCoordinator:
         )
 
         selected_platforms = req.platforms
-        pace_delay = 0.0 if os.environ.get("PYTEST_CURRENT_TEST") else 0.25
-        for idx in range(req.num_concepts):
-            if pace_delay and not gemini_plan:
-                await asyncio.sleep(pace_delay)
+
+        async def _build_single_concept(idx: int) -> tuple[VisualAsset, bool]:
             platform = selected_platforms[idx % len(selected_platforms)]
             aspect, width, height = PLATFORM_ASPECT_RATIOS.get(platform, ("1:1", 900, 580))
             fallback_title, fallback_style = concept_angles[idx % len(concept_angles)]
-            c_item = gemini_concepts[idx] if idx < len(gemini_concepts) and isinstance(gemini_concepts[idx], dict) else {}
+            c_item = (
+                gemini_concepts[idx]
+                if idx < len(gemini_concepts) and isinstance(gemini_concepts[idx], dict)
+                else {}
+            )
             angle_title = str(c_item.get("title") or fallback_title)[:120]
             prompt_used = str(
                 c_item.get("image_prompt")
@@ -1160,56 +1162,45 @@ class CampaignCoordinator:
                 color_tokens=palette,
                 alt_text=f"{req.brand_name} {angle_title} visual for {platform}",
             )
-            assets.append(asset)
+            return asset, (img_result is not None)
 
+        # Generate all concepts in parallel for instant visual delivery
+        concept_results = await asyncio.gather(
+            *[_build_single_concept(idx) for idx in range(req.num_concepts)]
+        )
+        for idx, (asset, used_ai) in enumerate(concept_results):
+            assets.append(asset)
             await self.band.post_room_message(
                 campaign_id=campaign.campaign_id,
                 room_id=campaign.room_id,
                 sender=AgentHandle.VISUAL.value,
                 event_type=EventType.ASSET_GENERATED,
                 message=(
-                    f"Generated {'Gemini AI' if img_result else 'studio'} visual concept "
-                    f"{idx + 1}/{req.num_concepts}: {asset.title} ({platform})."
+                    f"Generated {'Gemini AI' if used_ai else 'studio'} visual concept "
+                    f"{idx + 1}/{req.num_concepts}: {asset.title} ({asset.platform})."
                 ),
                 payload={"asset": asset.model_dump(mode="json")},
                 trigger_mentions=False,
             )
 
-        # Render cinematic H.264 MP4 promo video (inspired by motionmaxxing + bang-motion + video-shotcraft)
+        # Schedule cinematic H.264 MP4 rendering asynchronously so creatives & copy finish immediately!
         if shutil.which("ffmpeg") and not os.environ.get("PYTEST_CURRENT_TEST"):
-            try:
-                default_style: ShotStyle = (
-                    "luxury_editorial"
-                    if "lux" in req.brand_tone.lower()
-                    else "pulse_drop"
-                    if "bold" in req.brand_tone.lower()
-                    else "obsidian_cinema"
-                )
-                video_asset = await self._render_video_asset(
-                    campaign=campaign,
+            default_style: ShotStyle = (
+                "luxury_editorial"
+                if "lux" in req.brand_tone.lower()
+                else "pulse_drop"
+                if "bold" in req.brand_tone.lower()
+                else "obsidian_cinema"
+            )
+            self._spawn(
+                self._render_background_video(
+                    campaign_id=campaign.campaign_id,
                     palette=palette,
                     aspect_ratio="16:9",
                     shot_style=default_style,
-                )
-                assets.append(video_asset)
-                await self.band.post_room_message(
-                    campaign_id=campaign.campaign_id,
-                    room_id=campaign.room_id,
-                    sender=AgentHandle.VISUAL.value,
-                    event_type=EventType.ASSET_GENERATED,
-                    message=(
-                        f"Rendered 10s cinematic H.264 promo video ({default_style}, 16:9) "
-                        f"with beat-synced soundtrack: {video_asset.title}."
-                    ),
-                    payload={"asset": video_asset.model_dump(mode="json")},
-                    trigger_mentions=False,
-                )
-            except Exception as exc:
-                logger.warning(
-                    "MP4 video rendering skipped for campaign %s: %s",
-                    campaign.campaign_id,
-                    exc,
-                )
+                ),
+                name=f"bg-video-{campaign.campaign_id}",
+            )
 
         mood_keywords = (
             [str(k) for k in gemini_plan.get("mood_keywords", []) if str(k).strip()][:6]
@@ -1341,9 +1332,6 @@ class CampaignCoordinator:
             )
 
         platform_copies: list[PlatformCopy] = []
-        pace_delay = 0.0 if os.environ.get("PYTEST_CURRENT_TEST") else 0.4
-        if pace_delay:
-            await asyncio.sleep(pace_delay)
         for idx, platform in enumerate(req.platforms):
             linked = assets[idx % len(assets)] if assets else None
             if platform == "linkedin":
@@ -1455,13 +1443,13 @@ class CampaignCoordinator:
             palette=palette,
             aspect_ratio=aspect_ratio,
             shot_style=shot_style,
-            duration_sec=8.0,
-            fps=18,
+            duration_sec=6.0,
+            fps=15,
         )
 
         await asyncio.to_thread(render_campaign_video_mp4, spec, out_path)
 
-        width, height = (450, 800) if aspect_ratio == "9:16" else (800, 450)
+        width, height = (360, 640) if aspect_ratio == "9:16" else (640, 360)
         return VisualAsset(
             asset_id=asset_id,
             title=f"{req.brand_name} — {style_meta['label']} Promo ({aspect_ratio})",
@@ -1477,8 +1465,58 @@ class CampaignCoordinator:
             width=width,
             height=height,
             color_tokens=palette,
-            alt_text=f"10s H.264 cinematic promo video for {req.brand_name}",
+            alt_text=f"6s H.264 cinematic promo video for {req.brand_name}",
         )
+
+    async def _render_background_video(
+        self,
+        *,
+        campaign_id: str,
+        palette: list[str],
+        aspect_ratio: AspectRatio = "16:9",
+        shot_style: ShotStyle = "obsidian_cinema",
+    ) -> None:
+        """Render the default MP4 promo video asynchronously without blocking visuals/copy."""
+        try:
+            # Yield briefly so handle_visual_output persists visual_output first
+            await asyncio.sleep(0.05)
+            campaign = await self.store.get_campaign(campaign_id)
+            if campaign is None:
+                return
+            video_asset = await self._render_video_asset(
+                campaign=campaign,
+                palette=palette,
+                aspect_ratio=aspect_ratio,
+                shot_style=shot_style,
+            )
+            latest = await self.store.get_campaign(campaign_id)
+            if latest is not None and latest.visual_output is not None:
+                latest.visual_output.assets.append(video_asset)
+                await self.store.set_visual_output(
+                    campaign_id,
+                    latest.visual_output,
+                    status=latest.status,
+                )
+            await self.band.post_room_message(
+                campaign_id=campaign_id,
+                room_id=campaign.room_id,
+                sender=AgentHandle.VISUAL.value,
+                event_type=EventType.ASSET_GENERATED,
+                message=(
+                    f"Rendered cinematic H.264 promo video ({shot_style}, {aspect_ratio}) "
+                    f"with beat-synced soundtrack: {video_asset.title}."
+                ),
+                payload={"asset": video_asset.model_dump(mode="json")},
+                trigger_mentions=False,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.warning(
+                "Background MP4 rendering skipped for campaign %s: %s",
+                campaign_id,
+                exc,
+            )
 
     async def render_campaign_video(
         self,
