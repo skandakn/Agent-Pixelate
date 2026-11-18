@@ -132,6 +132,7 @@ export function CampaignWorkspace() {
           },
           onPartialAssets: (partial) => {
             setPartialAssets((prev) => ({ ...prev, ...partial }));
+            setFinalAssets((prev) => (prev ? { ...prev, ...partial } : prev));
           },
           onApprovalRequired: () => {
             setStatus("awaiting_approval");

@@ -6,7 +6,9 @@ export type VideoShotStyle =
   | "obsidian_cinema"
   | "kinetic_type"
   | "luxury_editorial"
-  | "pulse_drop";
+  | "pulse_drop"
+  | "vox_collage"
+  | "ink_press";
 
 export type VideoAspectRatio = "16:9" | "9:16";
 

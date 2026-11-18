@@ -31,7 +31,7 @@ const SHOT_RECIPES: {
   {
     id: "obsidian_cinema",
     label: "Obsidian Cinema",
-    curve: "softLand · 65°",
+    curve: "softLand · 24fps",
     tag: "bang-motion",
   },
   {
@@ -43,15 +43,34 @@ const SHOT_RECIPES: {
   {
     id: "luxury_editorial",
     label: "Luxury Editorial",
-    curve: "velvetDrift · 24fps",
-    tag: "shotcraft",
+    curve: "velvetDrift · Gold",
+    tag: "lemo-opuscar",
   },
   {
     id: "pulse_drop",
     label: "Pulse Drop",
     curve: "whipPush · 124 BPM",
-    tag: "beat-sync",
+    tag: "video-shotcraft",
   },
+  {
+    id: "vox_collage",
+    label: "Vox Collage",
+    curve: "halftone · Cutout",
+    tag: "vox-director",
+  },
+  {
+    id: "ink_press",
+    label: "Ink Press",
+    curve: "pressStamp · Swiss",
+    tag: "video-shotcraft",
+  },
+];
+
+const DIRECTOR_BEATS = [
+  { beat: "01", window: "0.0–2.0s", label: "Hook Wipe", move: "Masked baseline reveal" },
+  { beat: "02", window: "2.0–4.2s", label: "Visual Proof", move: "Ken Burns 1.0→1.14x" },
+  { beat: "03", window: "4.2–6.2s", label: "Brand World", move: "Palette swatch rail" },
+  { beat: "04", window: "6.2–8.0s", label: "CTA Lockup", move: "Beat-synced pulse" },
 ];
 
 interface VideoStudioPlayerProps {
@@ -112,39 +131,58 @@ export function VideoStudioPlayer({
       const dur = 10;
       const t = tSec % dur;
       const progress = t / dur;
-      const primary = palette[1]?.hex ?? "#8B5CF6";
+      const isLightPaper = shotStyle === "vox_collage" || shotStyle === "ink_press";
+      const primary =
+        shotStyle === "vox_collage"
+          ? "#DC2626"
+          : shotStyle === "ink_press"
+            ? "#18181B"
+            : (palette[1]?.hex ?? "#8B5CF6");
       const accent =
         shotStyle === "luxury_editorial"
           ? "#D4AF37"
-          : (palette[2]?.hex ?? "#06B6D4");
+          : shotStyle === "vox_collage"
+            ? "#EAB308"
+            : shotStyle === "ink_press"
+              ? "#E11D48"
+              : (palette[2]?.hex ?? "#06B6D4");
+      const textCol = isLightPaper ? "#18181B" : "#FFFFFF";
+      const mutedCol = isLightPaper ? "rgba(24,24,27,0.72)" : "rgba(255,255,255,0.72)";
       const beatPulse = Math.exp(-((t % 1.25) * 4.5));
       const isVertical = h > w;
 
-      ctx.fillStyle = "#09090B";
+      ctx.fillStyle =
+        shotStyle === "vox_collage"
+          ? "#F4EFE6"
+          : shotStyle === "ink_press"
+            ? "#F7F6F2"
+            : "#09090B";
       ctx.fillRect(0, 0, w, h);
 
-      // Moving volumetric studio glows
-      const g1x = w * (0.72 - 0.14 * progress) + Math.sin(progress * Math.PI * 2) * 28;
-      const g1y = h * (0.3 + 0.12 * Math.sin(progress * Math.PI));
-      const g1 = ctx.createRadialGradient(g1x, g1y, 10, g1x, g1y, Math.min(w, h) * 0.65);
-      g1.addColorStop(0, `${primary}77`);
-      g1.addColorStop(1, "rgba(9,9,11,0)");
-      ctx.fillStyle = g1;
-      ctx.fillRect(0, 0, w, h);
+      // Moving volumetric studio glows (dark modes only)
+      if (!isLightPaper) {
+        const g1x = w * (0.72 - 0.14 * progress) + Math.sin(progress * Math.PI * 2) * 28;
+        const g1y = h * (0.3 + 0.12 * Math.sin(progress * Math.PI));
+        const g1 = ctx.createRadialGradient(g1x, g1y, 10, g1x, g1y, Math.min(w, h) * 0.65);
+        g1.addColorStop(0, `${primary}77`);
+        g1.addColorStop(1, "rgba(9,9,11,0)");
+        ctx.fillStyle = g1;
+        ctx.fillRect(0, 0, w, h);
 
-      const g2x = w * (0.24 + 0.14 * progress);
-      const g2y = h * (0.78 - 0.1 * progress);
-      const g2 = ctx.createRadialGradient(g2x, g2y, 8, g2x, g2y, Math.min(w, h) * 0.55);
-      g2.addColorStop(0, `${accent}55`);
-      g2.addColorStop(1, "rgba(9,9,11,0)");
-      ctx.fillStyle = g2;
-      ctx.fillRect(0, 0, w, h);
+        const g2x = w * (0.24 + 0.14 * progress);
+        const g2y = h * (0.78 - 0.1 * progress);
+        const g2 = ctx.createRadialGradient(g2x, g2y, 8, g2x, g2y, Math.min(w, h) * 0.55);
+        g2.addColorStop(0, `${accent}55`);
+        g2.addColorStop(1, "rgba(9,9,11,0)");
+        ctx.fillStyle = g2;
+        ctx.fillRect(0, 0, w, h);
+      }
 
-      // Parallax dot grid
-      const step = 32;
+      // Parallax halftone / Swiss grid / dot grid
+      const step = shotStyle === "vox_collage" ? 20 : 32;
       const ox = (t * 14) % step;
       const oy = (t * 7) % step;
-      ctx.fillStyle = "rgba(255,255,255,0.08)";
+      ctx.fillStyle = isLightPaper ? "rgba(24,24,27,0.09)" : "rgba(255,255,255,0.08)";
       for (let x = -step + ox; x < w + step; x += step) {
         for (let y = -step + oy; y < h + step; y += step) {
           ctx.fillRect(x, y, 1.5, 1.5);
@@ -153,8 +191,8 @@ export function VideoStudioPlayer({
 
       // Studio frame
       const pad = 22;
-      ctx.strokeStyle = "rgba(255,255,255,0.14)";
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = isLightPaper ? "rgba(24,24,27,0.35)" : "rgba(255,255,255,0.14)";
+      ctx.lineWidth = shotStyle === "ink_press" ? 2 : 1;
       ctx.strokeRect(pad, pad, w - pad * 2, h - pad * 2);
 
       // Top telemetry bar
@@ -163,12 +201,12 @@ export function VideoStudioPlayer({
       ctx.arc(pad + 18, pad + 20, 4, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = "rgba(255,255,255,0.88)";
+      ctx.fillStyle = textCol;
       ctx.font = "700 12px monospace";
       ctx.fillText(brief.productName.toUpperCase().slice(0, 26), pad + 30, pad + 24);
 
       const tc = `00:0${Math.floor(t)}:${String(Math.floor((t % 1) * 24)).padStart(2, "0")} // ${shotStyle.toUpperCase()}`;
-      ctx.fillStyle = accent;
+      ctx.fillStyle = isLightPaper ? "#18181B" : accent;
       const tcW = ctx.measureText(tc).width;
       ctx.fillText(tc, w - pad - 16 - tcW, pad + 24);
 
@@ -206,13 +244,17 @@ export function VideoStudioPlayer({
       if (t < 3.2) {
         const e = easeSnapSettle(t / 0.7);
         ctx.globalAlpha = Math.max(0, Math.min(1, e * (1 - Math.max(0, (t - 2.8) / 0.4))));
-        ctx.fillStyle = accent;
+        if (shotStyle === "vox_collage") {
+          ctx.fillStyle = "#FACC15";
+          ctx.fillRect(tx - 4, ty - 20 + (1 - e) * 24, 310, 38);
+        }
+        ctx.fillStyle = isLightPaper ? primary : accent;
         ctx.font = "700 11px monospace";
         ctx.fillText(`${brief.brandTone.toUpperCase()} LAUNCH FILM`, tx, ty - 28 + (1 - e) * 24);
-        ctx.fillStyle = "#FFFFFF";
+        ctx.fillStyle = textCol;
         ctx.font = "800 32px sans-serif";
         ctx.fillText(brief.productName.toUpperCase().slice(0, 22), tx, ty + 10 + (1 - e) * 24);
-        ctx.fillStyle = "rgba(255,255,255,0.72)";
+        ctx.fillStyle = mutedCol;
         ctx.font = "500 14px sans-serif";
         ctx.fillText(brief.targetAudience.slice(0, 48), tx, ty + 38 + (1 - e) * 24);
       } else if (t < 6.8) {
@@ -222,22 +264,22 @@ export function VideoStudioPlayer({
         ctx.fillStyle = primary;
         ctx.font = "700 11px monospace";
         ctx.fillText("02 // CRAFTED FOR DAILY IMPACT", tx, ty - 24 + (1 - e) * 22);
-        ctx.fillStyle = "#FFFFFF";
+        ctx.fillStyle = textCol;
         ctx.font = "700 22px sans-serif";
         ctx.fillText(brief.productDescription.slice(0, 44), tx, ty + 12 + (1 - e) * 22);
-        ctx.fillStyle = "rgba(255,255,255,0.65)";
+        ctx.fillStyle = mutedCol;
         ctx.font = "500 14px sans-serif";
         ctx.fillText(brief.productDescription.slice(44, 96), tx, ty + 38 + (1 - e) * 22);
       } else {
         const lt = t - 6.8;
         const e = easeSoftLand(lt / 0.7);
         ctx.globalAlpha = Math.max(0, Math.min(1, e));
-        ctx.fillStyle = "#FFFFFF";
+        ctx.fillStyle = textCol;
         ctx.font = "800 30px sans-serif";
         ctx.fillText(`EXPERIENCE ${brief.productName.toUpperCase().slice(0, 18)}`, tx, ty + (1 - e) * 20);
-        ctx.fillStyle = accent;
-        ctx.fillRect(tx, ty + 20 + (1 - e) * 20, 136, 32);
-        ctx.fillStyle = "#09090B";
+        ctx.fillStyle = isLightPaper ? "#18181B" : accent;
+        ctx.fillRect(tx, ty + 20 + (1 - e) * 20, 146, 32);
+        ctx.fillStyle = isLightPaper ? "#FFFFFF" : "#09090B";
         ctx.font = "800 12px monospace";
         ctx.fillText("SHOP THE DROP →", tx + 14, ty + 40 + (1 - e) * 20);
       }
@@ -245,9 +287,9 @@ export function VideoStudioPlayer({
 
       // Progress timeline bar
       const by = h - pad - 10;
-      ctx.fillStyle = "rgba(255,255,255,0.16)";
+      ctx.fillStyle = isLightPaper ? "rgba(24,24,27,0.16)" : "rgba(255,255,255,0.16)";
       ctx.fillRect(pad + 16, by, w - pad * 2 - 32, 3);
-      ctx.fillStyle = accent;
+      ctx.fillStyle = isLightPaper ? "#18181B" : accent;
       ctx.fillRect(pad + 16, by, (w - pad * 2 - 32) * progress, 3);
     },
     [brief, palette, shotStyle]
@@ -355,8 +397,8 @@ export function VideoStudioPlayer({
           </div>
         </div>
 
-        {/* 4 Shot Recipe Cards */}
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {/* 6 Shot Recipe Cards (distilled from starred motion-design repos) */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {SHOT_RECIPES.map((recipe) => {
             const active = shotStyle === recipe.id;
             return (
@@ -371,8 +413,13 @@ export function VideoStudioPlayer({
                     : "border-black/[0.06] bg-white/70 text-[#6E6E73] hover:bg-white hover:text-[#1D1D1F]"
                 )}
               >
-                <div className="truncate text-[12px] font-semibold">
-                  {recipe.label}
+                <div className="flex items-center justify-between gap-1">
+                  <span className="truncate text-[12px] font-semibold">
+                    {recipe.label}
+                  </span>
+                  <span className="shrink-0 rounded bg-black/[0.05] px-1.5 py-0.5 font-mono text-[9px] text-[#6E6E73]">
+                    {recipe.tag}
+                  </span>
                 </div>
                 <div className="mt-0.5 truncate font-mono text-[10px] text-[#86868B]">
                   {recipe.curve}
@@ -549,6 +596,24 @@ export function VideoStudioPlayer({
           </div>
         </div>
       )}
+      {/* 4-Beat Director's Dramaturgy Shot List (visual-skills / narrative-film-direction) */}
+      <div className="grid grid-cols-2 gap-2 rounded-2xl bg-[#F5F5F7] p-3 sm:grid-cols-4">
+        {DIRECTOR_BEATS.map((b) => (
+          <div
+            key={b.beat}
+            className="rounded-xl border border-black/[0.05] bg-white px-2.5 py-2"
+          >
+            <div className="flex items-center justify-between font-mono text-[10px] text-[#86868B]">
+              <span className="font-semibold text-[#0071E3]">BEAT {b.beat}</span>
+              <span>{b.window}</span>
+            </div>
+            <div className="mt-0.5 text-[11px] font-semibold text-[#1D1D1F]">
+              {b.label}
+            </div>
+            <div className="truncate text-[10px] text-[#6E6E73]">{b.move}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

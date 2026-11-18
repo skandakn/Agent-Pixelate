@@ -263,13 +263,17 @@ function adaptBackendCampaignToAssets(
       : `${apiBase}${asset.asset_url.startsWith("/") ? "" : "/"}${asset.asset_url}`;
     const ar: VideoAspectRatio = asset.aspect_ratio === "9:16" ? "9:16" : "16:9";
     const idLower = `${asset.asset_id} ${asset.title}`.toLowerCase();
-    const style: VideoShotStyle = idLower.includes("kinetic")
-      ? "kinetic_type"
-      : idLower.includes("luxury")
-        ? "luxury_editorial"
-        : idLower.includes("pulse")
-          ? "pulse_drop"
-          : "obsidian_cinema";
+    const style: VideoShotStyle = idLower.includes("vox")
+      ? "vox_collage"
+      : idLower.includes("ink")
+        ? "ink_press"
+        : idLower.includes("kinetic")
+          ? "kinetic_type"
+          : idLower.includes("luxury")
+            ? "luxury_editorial"
+            : idLower.includes("pulse")
+              ? "pulse_drop"
+              : "obsidian_cinema";
     return {
       id: asset.asset_id || `${backend.campaign_id}-vid-${idx + 1}`,
       title: asset.title,
@@ -631,11 +635,13 @@ export function launchCampaignSession(
     fallbackController = runSimulatedCampaignStream(brief, callbacks, reason);
   };
 
+  let videoPollAttempts = 0;
+
   const hydrateFromBackend = async (
     campaignId: string,
     finalizeIfDone: boolean
   ) => {
-    if (cancelled || completed) return;
+    if (cancelled) return;
     try {
       const res = await fetch(`${apiBase}/api/campaigns/${campaignId}`);
       if (!res.ok) return;
@@ -664,6 +670,14 @@ export function launchCampaignSession(
         });
       }
 
+      if (completed) {
+        videoPollAttempts += 1;
+        if (adapted.videos.length > 0 || videoPollAttempts >= 8) {
+          stopPolling();
+        }
+        return;
+      }
+
       if (detail.status === "awaiting_approval") {
         callbacks.onApprovalRequired?.();
       } else if (
@@ -672,15 +686,16 @@ export function launchCampaignSession(
           (detail.visual_output && detail.copy_output))
       ) {
         completed = true;
-        stopPolling();
-        if (activeSocket) {
-          try {
-            activeSocket.close();
-          } catch {
-            // Ignore
-          }
-        }
         callbacks.onComplete(adapted);
+        if (adapted.videos.length > 0) {
+          stopPolling();
+        } else {
+          // Keep light background polling briefly until async MP4 finishes
+          stopPolling();
+          pollInterval = setInterval(() => {
+            void hydrateFromBackend(campaignId, false);
+          }, 1500);
+        }
       } else if (detail.status === "failed") {
         stopPolling();
         callbacks.onError(detail.error || "Campaign execution failed.");
@@ -763,10 +778,10 @@ export function launchCampaignSession(
       const seenEventIds = new Set<string>();
       let wsConnected = false;
 
-      // Safety background poll so completion is guaranteed even if proxy drops WS
+      // Fast background poll so UI hydrates immediately even if proxy buffers WS
       pollInterval = setInterval(() => {
         void hydrateFromBackend(campaignId, true);
-      }, 2000);
+      }, 600);
 
       ws.onopen = () => {
         wsConnected = true;

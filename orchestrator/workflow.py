@@ -35,6 +35,7 @@ from orchestrator.video_renderer import (
     SHOT_STYLES,
     ShotStyle,
     VideoRenderSpec,
+    build_directors_shot_list,
     render_campaign_video_mp4,
 )
 from shared.schemas import (
@@ -121,6 +122,7 @@ class CampaignCoordinator:
         self._background_tasks: set[asyncio.Task[None]] = set()
         self._http: httpx.AsyncClient | None = None
         self._video_semaphore = asyncio.Semaphore(2)
+        self._gemini_image_disabled: bool = False
 
         # Wire Band `@mention` routing directly to agent dispatchers
         self.band.register_mention_handler(
@@ -1344,10 +1346,11 @@ class CampaignCoordinator:
                     "contents": [{"parts": [{"text": prompt}]}],
                     "generationConfig": {
                         "temperature": 0.65,
+                        "maxOutputTokens": 900,
                         "responseMimeType": "application/json",
                     },
                 },
-                timeout=30.0,
+                timeout=8.0,
             )
             if resp.status_code >= 400:
                 logger.warning("Gemini JSON call (%s) HTTP %s: %s", model, resp.status_code, resp.text[:200])
@@ -1372,7 +1375,12 @@ class CampaignCoordinator:
     async def _gemini_generate_image(self, prompt: str) -> tuple[bytes, str] | None:
         """Generate a real campaign visual via Gemini Flash Image when `GEMINI_API_KEY` is configured."""
         api_key = self.settings.gemini_api_key
-        if not api_key or os.environ.get("PYTEST_CURRENT_TEST") or self._http is None:
+        if (
+            not api_key
+            or self._gemini_image_disabled
+            or os.environ.get("PYTEST_CURRENT_TEST")
+            or self._http is None
+        ):
             return None
 
         model = os.environ.get("GEMINI_IMAGE_MODEL", "gemini-3.1-flash-lite-image")
@@ -1385,8 +1393,16 @@ class CampaignCoordinator:
                     "contents": [{"parts": [{"text": prompt}]}],
                     "generationConfig": {"responseModalities": ["IMAGE"]},
                 },
-                timeout=40.0,
+                timeout=6.0,
             )
+            if resp.status_code in (400, 403, 404):
+                logger.warning(
+                    "Gemini image model %s unavailable (HTTP %s); disabling for fast studio SVG rendering.",
+                    model,
+                    resp.status_code,
+                )
+                self._gemini_image_disabled = True
+                return None
             if resp.status_code >= 400:
                 logger.warning("Gemini image call (%s) HTTP %s", model, resp.status_code)
                 return None
@@ -1455,14 +1471,16 @@ class CampaignCoordinator:
         )
 
         selected_platforms = req.platforms
-        pace_delay = 0.0 if os.environ.get("PYTEST_CURRENT_TEST") else 0.25
-        for idx in range(req.num_concepts):
-            if pace_delay and not gemini_plan:
-                await asyncio.sleep(pace_delay)
+
+        async def _build_single_concept(idx: int) -> tuple[VisualAsset, bool]:
             platform = selected_platforms[idx % len(selected_platforms)]
             aspect, width, height = PLATFORM_ASPECT_RATIOS.get(platform, ("1:1", 900, 580))
             fallback_title, fallback_style = concept_angles[idx % len(concept_angles)]
-            c_item = gemini_concepts[idx] if idx < len(gemini_concepts) and isinstance(gemini_concepts[idx], dict) else {}
+            c_item = (
+                gemini_concepts[idx]
+                if idx < len(gemini_concepts) and isinstance(gemini_concepts[idx], dict)
+                else {}
+            )
             angle_title = str(c_item.get("title") or fallback_title)[:120]
             prompt_used = str(
                 c_item.get("image_prompt")
@@ -1515,47 +1533,58 @@ class CampaignCoordinator:
                 color_tokens=palette,
                 alt_text=f"{req.brand_name} {angle_title} visual for {platform}",
             )
-            assets.append(asset)
+            return asset, (img_result is not None)
 
+        # Generate all concepts in parallel for instant visual delivery
+        concept_results = await asyncio.gather(
+            *[_build_single_concept(idx) for idx in range(req.num_concepts)]
+        )
+        for idx, (asset, used_ai) in enumerate(concept_results):
+            assets.append(asset)
             await self.band.post_room_message(
                 campaign_id=campaign.campaign_id,
                 room_id=campaign.room_id,
                 sender=AgentHandle.VISUAL.value,
                 event_type=EventType.ASSET_GENERATED,
                 message=(
-                    f"Generated {'Gemini AI' if img_result else 'studio'} visual concept "
-                    f"{idx + 1}/{req.num_concepts}: {asset.title} ({platform})."
+                    f"Generated {'Gemini AI' if used_ai else 'studio'} visual concept "
+                    f"{idx + 1}/{req.num_concepts}: {asset.title} ({asset.platform})."
                 ),
                 payload={"asset": asset.model_dump(mode="json")},
                 trigger_mentions=False,
             )
 
-        # Schedule optional cinematic H.264 MP4 promo video asynchronously (non-blocking)
-        # so multi-user visual/copy orchestration is never starved by CPU-bound FFmpeg renders.
-        auto_video_enabled = os.environ.get("AUTO_RENDER_VIDEO", "false").strip().lower() in {
-            "1",
-            "true",
-            "yes",
+        # Schedule cinematic 24fps H.264 MP4 rendering asynchronously so creatives & copy finish immediately!
+        auto_video_enabled = os.environ.get("AUTO_RENDER_VIDEO", "true").strip().lower() not in {
+            "0",
+            "false",
+            "no",
         }
         if (
             auto_video_enabled
             and shutil.which("ffmpeg")
             and not os.environ.get("PYTEST_CURRENT_TEST")
         ):
+            tone_l = req.brand_tone.lower()
             default_style: ShotStyle = (
                 "luxury_editorial"
-                if "lux" in req.brand_tone.lower()
+                if "lux" in tone_l
+                else "vox_collage"
+                if ("playful" in tone_l or "witty" in tone_l or "story" in tone_l)
+                else "ink_press"
+                if ("minimal" in tone_l or "editorial" in tone_l or "clean" in tone_l)
                 else "pulse_drop"
-                if "bold" in req.brand_tone.lower()
+                if "bold" in tone_l
                 else "obsidian_cinema"
             )
             self._spawn(
-                self._render_background_promo_video(
+                self._render_background_video(
                     campaign_id=campaign.campaign_id,
+                    palette=palette,
                     aspect_ratio="16:9",
                     shot_style=default_style,
                 ),
-                name=f"video-bg-{campaign.campaign_id}",
+                name=f"bg-video-{campaign.campaign_id}",
             )
 
         mood_keywords = (
@@ -1688,9 +1717,6 @@ class CampaignCoordinator:
             )
 
         platform_copies: list[PlatformCopy] = []
-        pace_delay = 0.0 if os.environ.get("PYTEST_CURRENT_TEST") else 0.4
-        if pace_delay:
-            await asyncio.sleep(pace_delay)
         for idx, platform in enumerate(req.platforms):
             linked = assets[idx % len(assets)] if assets else None
             if platform == "linkedin":
@@ -1766,6 +1792,7 @@ class CampaignCoordinator:
         palette: list[str],
         aspect_ratio: AspectRatio = "16:9",
         shot_style: ShotStyle = "obsidian_cinema",
+        hero_image_paths: list[str] | None = None,
     ) -> VisualAsset:
         req = campaign.request
         style_meta = SHOT_STYLES.get(shot_style, SHOT_STYLES["obsidian_cinema"])
@@ -1790,6 +1817,17 @@ class CampaignCoordinator:
             else "Shop Now"
         )
 
+        # Auto-discover generated Gemini PNG/JPG visuals for Ken Burns hero compositing
+        resolved_heroes = list(hero_image_paths or [])
+        if not resolved_heroes and campaign.visual_output:
+            resolved_heroes = [
+                a.file_path
+                for a in campaign.visual_output.assets
+                if a.file_path
+                and a.mime_type.startswith("image/")
+                and not a.mime_type.endswith("svg+xml")
+            ]
+
         spec = VideoRenderSpec(
             brand_name=req.brand_name,
             tagline=tagline,
@@ -1803,21 +1841,24 @@ class CampaignCoordinator:
             aspect_ratio=aspect_ratio,
             shot_style=shot_style,
             duration_sec=8.0,
-            fps=18,
+            fps=24,
+            hero_image_paths=resolved_heroes,
         )
+        shot_list = build_directors_shot_list(spec)
 
         async with self._video_semaphore:
             await asyncio.to_thread(render_campaign_video_mp4, spec, out_path)
 
-        width, height = (450, 800) if aspect_ratio == "9:16" else (800, 450)
+        width, height = (540, 960) if aspect_ratio == "9:16" else (960, 540)
+        beats_summary = " → ".join(f"{s['beat']} {s['name']}" for s in shot_list)
         return VisualAsset(
             asset_id=asset_id,
             title=f"{req.brand_name} — {style_meta['label']} Promo ({aspect_ratio})",
             platform="video_reel" if aspect_ratio == "9:16" else "video_cinema",
             aspect_ratio=aspect_ratio,
             prompt_used=(
-                f"MotionMaxx/ShotCraft {style_meta['label']} ({style_meta['curve']}): "
-                f"{style_meta['description']}"
+                f"[{style_meta.get('source', 'shotcraft')}] {style_meta['label']} ({style_meta['curve']}): "
+                f"{style_meta['description']} | Shot List: {beats_summary}"
             ),
             file_path=str(out_path),
             asset_url=f"/api/campaigns/{campaign.campaign_id}/assets/{filename}",
@@ -1825,26 +1866,55 @@ class CampaignCoordinator:
             width=width,
             height=height,
             color_tokens=palette,
-            alt_text=f"10s H.264 cinematic promo video for {req.brand_name}",
+            alt_text=f"24fps H.264 cinematic promo video for {req.brand_name}",
         )
 
-    async def _render_background_promo_video(
+    async def _render_background_video(
         self,
         *,
         campaign_id: str,
+        palette: list[str],
         aspect_ratio: AspectRatio = "16:9",
         shot_style: ShotStyle = "obsidian_cinema",
     ) -> None:
-        """Non-blocking background MP4 enrichment bounded by `self._video_semaphore`."""
+        """Render the default MP4 promo video asynchronously without blocking visuals/copy."""
         try:
-            await self.render_campaign_video(
-                campaign_id, aspect_ratio=aspect_ratio, shot_style=shot_style
+            # Yield briefly so handle_visual_output persists visual_output first
+            await asyncio.sleep(0.05)
+            campaign = await self.store.get_campaign(campaign_id)
+            if campaign is None:
+                return
+            video_asset = await self._render_video_asset(
+                campaign=campaign,
+                palette=palette,
+                aspect_ratio=aspect_ratio,
+                shot_style=shot_style,
+            )
+            latest = await self.store.get_campaign(campaign_id)
+            if latest is not None and latest.visual_output is not None:
+                latest.visual_output.assets.append(video_asset)
+                await self.store.set_visual_output(
+                    campaign_id,
+                    latest.visual_output,
+                    status=latest.status,
+                )
+            await self.band.post_room_message(
+                campaign_id=campaign_id,
+                room_id=campaign.room_id,
+                sender=AgentHandle.VISUAL.value,
+                event_type=EventType.ASSET_GENERATED,
+                message=(
+                    f"Rendered cinematic H.264 promo video ({shot_style}, {aspect_ratio}) "
+                    f"with beat-synced soundtrack: {video_asset.title}."
+                ),
+                payload={"asset": video_asset.model_dump(mode="json")},
+                trigger_mentions=False,
             )
         except asyncio.CancelledError:
             raise
         except Exception as exc:
             logger.warning(
-                "Background MP4 video rendering skipped for campaign %s: %s",
+                "Background MP4 rendering skipped for campaign %s: %s",
                 campaign_id,
                 exc,
             )
