@@ -34,6 +34,7 @@ from orchestrator.video_renderer import (
     SHOT_STYLES,
     ShotStyle,
     VideoRenderSpec,
+    build_directors_shot_list,
     render_campaign_video_mp4,
 )
 from shared.schemas import (
@@ -1524,13 +1525,18 @@ class CampaignCoordinator:
                 trigger_mentions=False,
             )
 
-        # Schedule cinematic H.264 MP4 rendering asynchronously so creatives & copy finish immediately!
+        # Schedule cinematic 24fps H.264 MP4 rendering asynchronously so creatives & copy finish immediately!
         if shutil.which("ffmpeg") and not os.environ.get("PYTEST_CURRENT_TEST"):
+            tone_l = req.brand_tone.lower()
             default_style: ShotStyle = (
                 "luxury_editorial"
-                if "lux" in req.brand_tone.lower()
+                if "lux" in tone_l
+                else "vox_collage"
+                if ("playful" in tone_l or "witty" in tone_l or "story" in tone_l)
+                else "ink_press"
+                if ("minimal" in tone_l or "editorial" in tone_l or "clean" in tone_l)
                 else "pulse_drop"
-                if "bold" in req.brand_tone.lower()
+                if "bold" in tone_l
                 else "obsidian_cinema"
             )
             self._spawn(
@@ -1748,6 +1754,7 @@ class CampaignCoordinator:
         palette: list[str],
         aspect_ratio: AspectRatio = "16:9",
         shot_style: ShotStyle = "obsidian_cinema",
+        hero_image_paths: list[str] | None = None,
     ) -> VisualAsset:
         req = campaign.request
         style_meta = SHOT_STYLES.get(shot_style, SHOT_STYLES["obsidian_cinema"])
@@ -1772,6 +1779,17 @@ class CampaignCoordinator:
             else "Shop Now"
         )
 
+        # Auto-discover generated Gemini PNG/JPG visuals for Ken Burns hero compositing
+        resolved_heroes = list(hero_image_paths or [])
+        if not resolved_heroes and campaign.visual_output:
+            resolved_heroes = [
+                a.file_path
+                for a in campaign.visual_output.assets
+                if a.file_path
+                and a.mime_type.startswith("image/")
+                and not a.mime_type.endswith("svg+xml")
+            ]
+
         spec = VideoRenderSpec(
             brand_name=req.brand_name,
             tagline=tagline,
@@ -1784,21 +1802,24 @@ class CampaignCoordinator:
             palette=palette,
             aspect_ratio=aspect_ratio,
             shot_style=shot_style,
-            duration_sec=6.0,
-            fps=15,
+            duration_sec=8.0,
+            fps=24,
+            hero_image_paths=resolved_heroes,
         )
+        shot_list = build_directors_shot_list(spec)
 
         await asyncio.to_thread(render_campaign_video_mp4, spec, out_path)
 
-        width, height = (360, 640) if aspect_ratio == "9:16" else (640, 360)
+        width, height = (540, 960) if aspect_ratio == "9:16" else (960, 540)
+        beats_summary = " → ".join(f"{s['beat']} {s['name']}" for s in shot_list)
         return VisualAsset(
             asset_id=asset_id,
             title=f"{req.brand_name} — {style_meta['label']} Promo ({aspect_ratio})",
             platform="video_reel" if aspect_ratio == "9:16" else "video_cinema",
             aspect_ratio=aspect_ratio,
             prompt_used=(
-                f"MotionMaxx/ShotCraft {style_meta['label']} ({style_meta['curve']}): "
-                f"{style_meta['description']}"
+                f"[{style_meta.get('source', 'shotcraft')}] {style_meta['label']} ({style_meta['curve']}): "
+                f"{style_meta['description']} | Shot List: {beats_summary}"
             ),
             file_path=str(out_path),
             asset_url=f"/api/campaigns/{campaign.campaign_id}/assets/{filename}",
@@ -1806,7 +1827,7 @@ class CampaignCoordinator:
             width=width,
             height=height,
             color_tokens=palette,
-            alt_text=f"6s H.264 cinematic promo video for {req.brand_name}",
+            alt_text=f"24fps H.264 cinematic promo video for {req.brand_name}",
         )
 
     async def _render_background_video(

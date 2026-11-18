@@ -263,13 +263,17 @@ function adaptBackendCampaignToAssets(
       : `${apiBase}${asset.asset_url.startsWith("/") ? "" : "/"}${asset.asset_url}`;
     const ar: VideoAspectRatio = asset.aspect_ratio === "9:16" ? "9:16" : "16:9";
     const idLower = `${asset.asset_id} ${asset.title}`.toLowerCase();
-    const style: VideoShotStyle = idLower.includes("kinetic")
-      ? "kinetic_type"
-      : idLower.includes("luxury")
-        ? "luxury_editorial"
-        : idLower.includes("pulse")
-          ? "pulse_drop"
-          : "obsidian_cinema";
+    const style: VideoShotStyle = idLower.includes("vox")
+      ? "vox_collage"
+      : idLower.includes("ink")
+        ? "ink_press"
+        : idLower.includes("kinetic")
+          ? "kinetic_type"
+          : idLower.includes("luxury")
+            ? "luxury_editorial"
+            : idLower.includes("pulse")
+              ? "pulse_drop"
+              : "obsidian_cinema";
     return {
       id: asset.asset_id || `${backend.campaign_id}-vid-${idx + 1}`,
       title: asset.title,
