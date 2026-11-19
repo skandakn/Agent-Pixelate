@@ -1,15 +1,7 @@
 "use client";
 
 import React from "react";
-import {
-  Download,
-  FileJson,
-  PanelLeft,
-  Plus,
-  Sparkles,
-  Wifi,
-  WifiOff,
-} from "lucide-react";
+import { Download, Plus, Sparkles, Wifi, WifiOff } from "lucide-react";
 import { CampaignAssets, CampaignStatus, ConnectionMode } from "@/types/campaign";
 import { cn } from "@/lib/utils";
 
@@ -21,139 +13,105 @@ interface TopNavProps {
   modeNotice: string | null;
   assets: CampaignAssets | null;
   onToggleMockMode: () => void;
-  onOpenMobileDrawer: () => void;
-  onExportJson: () => void;
+  onOpenMobileDrawer?: () => void;
+  onNewCustomRun?: () => void;
+  onExportJson?: () => void;
   onExportZip: () => void;
   isExportingZip: boolean;
-  onNewCustomRun?: () => void;
 }
 
 export function TopNav({
-  campaignId,
   status,
   preferMockMode,
   resolvedMode,
-  modeNotice,
   assets,
   onToggleMockMode,
-  onOpenMobileDrawer,
-  onExportJson,
+  onNewCustomRun,
   onExportZip,
   isExportingZip,
-  onNewCustomRun,
 }: TopNavProps) {
   const isLive = resolvedMode === "live" && !preferMockMode;
 
   return (
-    <header className="sticky top-0 z-30 border-b border-black/[0.08] bg-[#FBFBFD]/80 backdrop-blur-xl">
-      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
-        {/* Left: Clean Brand + Mobile Menu Button */}
+    <header className="sticky top-0 z-30 border-b-2 border-black bg-white/95 backdrop-blur-md">
+      <div className="mx-auto flex h-14 max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6">
+        {/* Left: Brand */}
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={onOpenMobileDrawer}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-black/[0.08] bg-white text-neutral-800 shadow-sm transition hover:bg-neutral-50 lg:hidden"
-            aria-label="Toggle Navigation"
-          >
-            <PanelLeft className="h-4 w-4" />
-          </button>
-
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-neutral-900 text-white shadow-sm">
-              <Sparkles className="h-4 w-4" />
-            </div>
-            <span className="font-sans text-base font-semibold tracking-tight text-[#1D1D1F]">
-              Pixelate
+          <div className="flex h-8 w-8 items-center justify-center border-2 border-black bg-[#10B981] text-black shadow-[2px_2px_0px_#000000]">
+            <Sparkles className="h-4 w-4 stroke-[2.5]" />
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="font-display text-base font-black tracking-tight text-black sm:text-lg">
+              AGENT PIXELATE
+            </span>
+            <span className="hidden font-mono text-[10px] font-bold uppercase tracking-widest text-black/50 sm:inline">
+              STUDIO
             </span>
           </div>
         </div>
 
-        {/* Center: Minimalist Active State Indicator */}
-        <div className="hidden items-center gap-2 md:flex">
-          {campaignId && (
-            <div className="flex items-center gap-2 rounded-full border border-black/[0.06] bg-white px-3 py-1 text-xs font-medium text-neutral-600 shadow-sm">
-              <span
-                className={cn(
-                  "h-2 w-2 rounded-full",
-                  status === "running"
-                    ? "animate-pulse bg-amber-500"
-                    : status === "completed"
-                      ? "bg-emerald-500"
-                      : "bg-neutral-300"
-                )}
-              />
-              <span className="text-neutral-900 font-semibold">{campaignId}</span>
-              {status === "running" && (
-                <span className="text-neutral-400 font-normal">· Orchestrating</span>
-              )}
-              {status === "completed" && (
-                <span className="text-neutral-400 font-normal">· Ready</span>
-              )}
+        {/* Center: Minimal Status Badge */}
+        <div className="hidden items-center gap-2 font-mono text-xs md:flex">
+          {status === "running" ? (
+            <div className="flex items-center gap-2 border-2 border-black bg-[#FEF3C7] px-3 py-1 font-bold text-black shadow-[2px_2px_0px_#000000]">
+              <span className="h-2 w-2 animate-ping rounded-full bg-[#F59E0B]" />
+              <span>AGENTS GENERATING CAMPAIGN...</span>
             </div>
-          )}
-
-          {modeNotice && (
-            <div className="max-w-xs truncate rounded-full border border-black/[0.06] bg-white px-3 py-1 text-xs text-neutral-500 shadow-sm">
-              {modeNotice}
+          ) : status === "completed" ? (
+            <div className="flex items-center gap-2 border-2 border-black bg-[#D1FAE5] px-3 py-1 font-bold text-black shadow-[2px_2px_0px_#000000]">
+              <span className="h-2 w-2 rounded-full bg-[#10B981]" />
+              <span>CAMPAIGN READY</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 border-2 border-black bg-black/5 px-3 py-1 font-semibold text-black/70">
+              <span className="h-2 w-2 rounded-full bg-black/40" />
+              <span>STUDIO IDLE</span>
             </div>
           )}
         </div>
 
-        {/* Right: Minimalist Controls & Clean Actions */}
+        {/* Right: Controls */}
         <div className="flex items-center gap-2">
           {onNewCustomRun && (
             <button
               type="button"
               onClick={onNewCustomRun}
-              title="Create a new custom campaign"
-              className="inline-flex items-center gap-1.5 rounded-full bg-[#1D1D1F] px-3.5 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-black"
+              className="inline-flex items-center gap-1.5 border-2 border-black bg-white px-3 py-1.5 font-mono text-xs font-bold uppercase text-black shadow-[2px_2px_0px_#000000] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none hover:bg-gray-50"
             >
-              <Plus className="h-3.5 w-3.5" />
-              <span>New Run</span>
+              <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+              <span>NEW RUN</span>
             </button>
           )}
 
           <button
             type="button"
             onClick={onToggleMockMode}
-            title="Toggle between Live WebSocket and Simulated Engine"
+            title="Toggle between Live Engine and Simulated Engine"
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all shadow-sm",
-              preferMockMode
-                ? "border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50"
-                : isLive
-                  ? "border-emerald-200 bg-emerald-50/80 text-emerald-800 hover:bg-emerald-100/60"
-                  : "border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50"
+              "hidden items-center gap-1.5 border-2 border-black px-2.5 py-1.5 font-mono text-xs font-bold uppercase transition-all sm:inline-flex",
+              isLive
+                ? "bg-[#D1FAE5] text-black shadow-[2px_2px_0px_#000000]"
+                : "bg-white text-black/70 shadow-[2px_2px_0px_#000000]"
             )}
           >
             {preferMockMode ? (
-              <WifiOff className="h-3 w-3 text-neutral-500" />
+              <WifiOff className="h-3 w-3" />
             ) : (
-              <Wifi className="h-3 w-3 text-emerald-600" />
+              <Wifi className="h-3 w-3 text-[#10B981]" />
             )}
-            <span>{preferMockMode ? "Simulated" : isLive ? "Live" : "Auto"}</span>
+            <span>{preferMockMode ? "SIMULATED" : isLive ? "LIVE ENGINE" : "CONNECTING"}</span>
           </button>
 
           {assets && (
-            <div className="hidden items-center gap-2 sm:flex">
-              <button
-                type="button"
-                onClick={onExportJson}
-                className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3.5 py-1.5 text-xs font-medium text-neutral-700 shadow-sm transition hover:bg-neutral-50"
-              >
-                <FileJson className="h-3.5 w-3.5 text-neutral-500" />
-                <span>JSON</span>
-              </button>
-              <button
-                type="button"
-                onClick={onExportZip}
-                disabled={isExportingZip}
-                className="inline-flex items-center gap-1.5 rounded-full bg-[#0071E3] px-4 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-[#0077ED] disabled:opacity-50"
-              >
-                <Download className="h-3.5 w-3.5" />
-                <span>{isExportingZip ? "Exporting..." : "Export Kit"}</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={onExportZip}
+              disabled={isExportingZip}
+              className="inline-flex items-center gap-1.5 border-2 border-black bg-[#10B981] px-3.5 py-1.5 font-mono text-xs font-black uppercase tracking-wider text-black shadow-[2px_2px_0px_#000000] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none disabled:opacity-50"
+            >
+              <Download className="h-3.5 w-3.5 stroke-[2.5]" />
+              <span>{isExportingZip ? "EXPORTING..." : "EXPORT KIT"}</span>
+            </button>
           )}
         </div>
       </div>
