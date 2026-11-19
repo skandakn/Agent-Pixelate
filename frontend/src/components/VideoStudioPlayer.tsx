@@ -2,25 +2,32 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Bell,
   Download,
+  ExternalLink,
   FileText,
-  Film,
   Loader2,
   Mic,
   Monitor,
   Pause,
   Play,
-  Radio,
   RotateCcw,
+  Settings,
   Smartphone,
   Sparkles,
   Square,
+  ThumbsDown,
+  ThumbsUp,
+  Tv,
+  User,
   Volume2,
-  Wand2,
+  VolumeX,
 } from "lucide-react";
 import {
   CampaignBrief,
   CampaignVideoAsset,
+  CharacterAvatarId,
+  CharacterPosition,
   ColorSwatch,
   StoryboardFrame,
   VideoAspectRatio,
@@ -28,6 +35,11 @@ import {
   VisualCreative,
 } from "@/types/campaign";
 import { cn, slugify } from "@/lib/utils";
+import {
+  CHARACTER_AVATARS,
+  CharacterRenderState,
+  drawCharacterAvatar,
+} from "@/lib/characterAnimation";
 
 const SHOT_RECIPES: {
   id: VideoShotStyle;
@@ -99,7 +111,7 @@ const DIRECTOR_BEATS = [
 ];
 
 const VOICEOVER_PRESETS: {
-  id: "auto" | "zira" | "david";
+  id: "auto" | "zira" | "david" | "aria";
   label: string;
   tag: string;
   desc: string;
@@ -108,19 +120,25 @@ const VOICEOVER_PRESETS: {
     id: "auto",
     label: "Adaptive Auto",
     tag: "Tone Matched",
-    desc: "Auto-selects female/male vocal timbre tailored to brand tone",
+    desc: "Auto-selects vocal persona tailored to product story",
   },
   {
     id: "zira",
-    label: "Aria / Zira",
-    tag: "Warm Studio",
-    desc: "Nuanced, editorial, conversational female studio voice",
+    label: "Sophia // Warm Host",
+    tag: "Editorial",
+    desc: "Nuanced, conversational lifestyle YouTube presenter",
   },
   {
     id: "david",
-    label: "David / Marcus",
-    tag: "Cinematic Executive",
-    desc: "Resonant, authoritative, high-energy male narrator",
+    label: "Marcus // Tech Lead",
+    tag: "Authoritative",
+    desc: "Resonant, high-credibility hardware reviewer",
+  },
+  {
+    id: "aria",
+    label: "Emma // YouTube Creator",
+    tag: "High Energy",
+    desc: "Dynamic, fast-paced YouTube unboxing cadence",
   },
 ];
 
@@ -141,6 +159,9 @@ interface VideoStudioPlayerProps {
       enableVoiceover?: boolean;
       voice?: string;
       voiceoverScript?: string;
+      enableCharacter?: boolean;
+      characterAvatar?: CharacterAvatarId;
+      characterPosition?: CharacterPosition;
     }
   ) => void;
 }
@@ -150,19 +171,11 @@ function easeSoftLand(t: number): number {
   return 1 - Math.pow(1 - c, 4);
 }
 
-function easeSnapSettle(t: number): number {
-  const c = Math.max(0, Math.min(1, t));
-  const c1 = 1.15;
-  const c3 = c1 + 1;
-  return 1 + c3 * Math.pow(c - 1, 3) + c1 * Math.pow(c - 1, 2);
-}
-
 export function VideoStudioPlayer({
   campaignId,
   brief,
   videos,
   creatives = [],
-  storyboard = [],
   isLiveBackend,
   isRenderingCut,
   renderError,
@@ -171,15 +184,33 @@ export function VideoStudioPlayer({
   const [aspectRatio, setAspectRatio] = useState<VideoAspectRatio>("16:9");
   const [shotStyle, setShotStyle] = useState<VideoShotStyle>("obsidian_cinema");
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
-  const activeVideo = videos[activeVideoIndex] ?? videos[0];
   const [isPlayingCanvas, setIsPlayingCanvas] = useState(true);
   const [isRecordingWebm, setIsRecordingWebm] = useState(false);
 
-  // Voiceover & soundstage configuration
+  // YouTube Player Shell State
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
+  const [isDisliked, setIsDisliked] = useState(false);
+  const [likeCount, setLikeCount] = useState(48200);
+  const [showCaptions, setShowCaptions] = useState(true);
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
+  const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolume] = useState(0.85);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [currentTimeSec, setCurrentTimeSec] = useState(0);
+
+  // Character Animation & Viseme Presenter State (LatentSync & TalkCraft)
+  const [enableCharacter, setEnableCharacter] = useState(true);
+  const [selectedAvatar, setSelectedAvatar] = useState<CharacterAvatarId>("maya");
+  const [characterPosition, setCharacterPosition] = useState<CharacterPosition>("pip_bottom_right");
+
+  // Voiceover & Soundstage State
   const [enableVoiceover, setEnableVoiceover] = useState(true);
-  const [selectedVoice, setSelectedVoice] = useState<"auto" | "zira" | "david">("auto");
+  const [selectedVoice, setSelectedVoice] = useState<"auto" | "zira" | "david" | "aria">("auto");
   const [showScriptDrawer, setShowScriptDrawer] = useState(false);
   const [isAuditioning, setIsAuditioning] = useState(false);
+
+  const durationMs = 8000;
 
   const defaultVoiceoverScript = useMemo(() => {
     const brand = brief.productName.trim();
@@ -196,16 +227,13 @@ export function VideoStudioPlayer({
   const [voiceoverScript, setVoiceoverScript] = useState("");
   const effectiveScript = voiceoverScript.trim() || defaultVoiceoverScript;
 
-  const handleAuditionVoiceover = useCallback(() => {
+  // Real Web Speech API Narration Player
+  const startSpeechNarration = useCallback(() => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    if (isAuditioning) {
-      window.speechSynthesis.cancel();
-      setIsAuditioning(false);
-      return;
-    }
+    if (!enableVoiceover || isMuted) return;
 
-    const text = effectiveScript;
-    const utter = new SpeechSynthesisUtterance(text);
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(effectiveScript);
     const voices = window.speechSynthesis.getVoices();
 
     if (
@@ -223,7 +251,6 @@ export function VideoStudioPlayer({
       );
       if (male) utter.voice = male;
       utter.pitch = 0.95;
-      utter.rate = 1.05;
     } else {
       const female = voices.find(
         (v) =>
@@ -234,28 +261,44 @@ export function VideoStudioPlayer({
       );
       if (female) utter.voice = female;
       utter.pitch = 1.05;
-      utter.rate = 1.0;
     }
+
+    utter.rate = playbackSpeed;
+    utter.volume = volume;
 
     utter.onend = () => setIsAuditioning(false);
     utter.onerror = () => setIsAuditioning(false);
 
-    setIsAuditioning(true);
-    window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utter);
-  }, [effectiveScript, isAuditioning, selectedVoice, brief.brandTone]);
+  }, [effectiveScript, enableVoiceover, isMuted, playbackSpeed, selectedVoice, volume, brief.brandTone]);
+
+  const stopSpeechNarration = useCallback(() => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      setIsAuditioning(false);
+    }
+  }, []);
+
+  const handleAuditionVoiceover = useCallback(() => {
+    if (isAuditioning) {
+      stopSpeechNarration();
+    } else {
+      setIsAuditioning(true);
+      startSpeechNarration();
+    }
+  }, [isAuditioning, startSpeechNarration, stopSpeechNarration]);
 
   useEffect(() => {
     return () => {
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-      }
+      stopSpeechNarration();
     };
-  }, []);
+  }, [stopSpeechNarration]);
 
+  // Canvas Refs
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animFrameRef = useRef<number | null>(null);
   const heroImageRef = useRef<HTMLImageElement | null>(null);
+
   useEffect(() => {
     const heroCreative = creatives[0];
     if (!heroCreative?.imageUrl) return;
@@ -267,7 +310,7 @@ export function VideoStudioPlayer({
     };
   }, [creatives]);
 
-  // Canvas 60fps Cinema Engine Loop
+  // 60fps Cinema Engine Loop with Character Presenter and YouTube Overlays
   const drawFrame = useCallback(
     (timestamp: number) => {
       const canvas = canvasRef.current;
@@ -275,58 +318,59 @@ export function VideoStudioPlayer({
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      const durationMs = 8000;
-      const progress = ((timestamp % durationMs) / durationMs);
+      const progress = (timestamp % durationMs) / durationMs;
+      setCurrentTimeSec(Math.round(progress * 8 * 10) / 10);
       const width = canvas.width;
       const height = canvas.height;
 
+      // 1. Dark Theater Canvas Ground
       ctx.fillStyle = "#0A0D14";
       ctx.fillRect(0, 0, width, height);
 
-      // Ken Burns Hero Image Rendering
+      // 2. Ken Burns Hero Product Frame
       const hero = heroImageRef.current;
       if (hero && hero.complete && hero.naturalWidth > 0) {
         ctx.save();
-        const kbScale = 1.0 + 0.12 * easeSoftLand(progress);
-        const kbPanX = (progress - 0.5) * 18;
-        const kbPanY = (progress - 0.5) * 12;
+        const kbScale = 1.0 + 0.14 * easeSoftLand(progress);
+        const kbPanX = (progress - 0.5) * 22;
+        const kbPanY = (progress - 0.5) * 14;
 
         ctx.translate(width / 2 + kbPanX, height / 2 + kbPanY);
         ctx.scale(kbScale, kbScale);
         ctx.translate(-width / 2, -height / 2);
 
-        ctx.globalAlpha = 0.55;
+        ctx.globalAlpha = 0.58;
         ctx.drawImage(hero, 0, 0, width, height);
         ctx.restore();
       }
 
-      // Background vignette gradient
+      // 3. Radial Vignette & Atmospheric Halos
       const grad = ctx.createRadialGradient(
         width / 2,
         height / 2,
-        width * 0.15,
+        width * 0.18,
         width / 2,
         height / 2,
-        width * 0.7
+        width * 0.72
       );
-      grad.addColorStop(0, "rgba(0,0,0,0.1)");
-      grad.addColorStop(1, "rgba(0,0,0,0.85)");
+      grad.addColorStop(0, "rgba(0,0,0,0.12)");
+      grad.addColorStop(1, "rgba(0,0,0,0.88)");
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, width, height);
 
-      // Text Overlays
+      // 4. Advertising Typography & Beat Choreography
       ctx.save();
       ctx.fillStyle = "#FFFFFF";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
       // Product Title
-      const titleAlpha = easeSoftLand(Math.min(1, progress * 4));
+      const titleAlpha = easeSoftLand(Math.min(1, progress * 4.2));
       ctx.globalAlpha = titleAlpha;
-      ctx.font = `900 ${Math.round(height * 0.082)}px Archivo, sans-serif`;
-      ctx.fillText(brief.productName.toUpperCase(), width / 2, height * 0.38);
+      ctx.font = `900 ${Math.round(height * 0.084)}px Archivo, Impact, sans-serif`;
+      ctx.fillText(brief.productName.toUpperCase(), width / 2, height * 0.36);
 
-      // Dynamic Beat / Tagline
+      // Beat Tagline
       const beatIndex = Math.min(
         DIRECTOR_BEATS.length - 1,
         Math.floor(progress * DIRECTOR_BEATS.length)
@@ -334,22 +378,28 @@ export function VideoStudioPlayer({
       const activeBeat = DIRECTOR_BEATS[beatIndex];
 
       ctx.fillStyle = "#10B981";
-      ctx.font = `700 ${Math.round(height * 0.038)}px 'JetBrains Mono', monospace`;
-      ctx.fillText(`BEAT ${activeBeat.beat} // ${activeBeat.label.toUpperCase()}`, width / 2, height * 0.52);
+      ctx.font = `700 ${Math.round(height * 0.036)}px 'JetBrains Mono', monospace`;
+      ctx.fillText(
+        `BEAT ${activeBeat.beat} // ${activeBeat.label.toUpperCase()}`,
+        width / 2,
+        height * 0.49
+      );
 
-      // Value Prop Subtitle
-      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      // Subtitle / Description Hook
+      ctx.fillStyle = "rgba(255,255,255,0.88)";
       ctx.font = `600 ${Math.round(height * 0.032)}px 'Hanken Grotesk', sans-serif`;
-      const snippet = brief.productDescription.slice(0, 60) + (brief.productDescription.length > 60 ? "…" : "");
-      ctx.fillText(snippet, width / 2, height * 0.62);
+      const snippet =
+        brief.productDescription.slice(0, 64) +
+        (brief.productDescription.length > 64 ? "…" : "");
+      ctx.fillText(snippet, width / 2, height * 0.58);
 
       // Film Gate Corner Brackets ⌜ ⌝ ⌞ ⌟
-      const pad = Math.round(width * 0.04);
-      const bLen = 14;
+      const pad = Math.round(width * 0.038);
+      const bLen = 16;
       ctx.strokeStyle = "rgba(16, 185, 129, 0.4)";
       ctx.lineWidth = 1.5;
-      // Top-Left
       ctx.beginPath();
+      // Top-Left
       ctx.moveTo(pad, pad + bLen); ctx.lineTo(pad, pad); ctx.lineTo(pad + bLen, pad);
       // Top-Right
       ctx.moveTo(width - pad - bLen, pad); ctx.lineTo(width - pad, pad); ctx.lineTo(width - pad, pad + bLen);
@@ -361,43 +411,97 @@ export function VideoStudioPlayer({
 
       // Optical Anamorphic Streak on Beat Transitions
       const localBeatProgress = (progress * DIRECTOR_BEATS.length) % 1;
-      if (localBeatProgress < 0.22) {
-        const flareIntensity = 1 - localBeatProgress / 0.22;
+      if (localBeatProgress < 0.2) {
+        const flareIntensity = 1 - localBeatProgress / 0.2;
         ctx.save();
-        ctx.strokeStyle = "rgba(0, 240, 255, " + (flareIntensity * 0.7).toFixed(2) + ")";
-        ctx.lineWidth = 2 * flareIntensity;
+        ctx.strokeStyle = `rgba(6, 182, 212, ${(flareIntensity * 0.75).toFixed(2)})`;
+        ctx.lineWidth = 2.5 * flareIntensity;
         ctx.beginPath();
-        ctx.moveTo(0, height * 0.52);
-        ctx.lineTo(width, height * 0.52);
+        ctx.moveTo(0, height * 0.49);
+        ctx.lineTo(width, height * 0.49);
         ctx.stroke();
         ctx.restore();
       }
 
-      // Voiceover Subtitle Caption Pill
-      if (enableVoiceover) {
+      // 5. YouTube Synchronized Subtitles (with yellow styling)
+      if (showCaptions && enableVoiceover) {
         ctx.save();
-        const voSnippet = effectiveScript.slice(0, 75);
-        ctx.font = `500 ${Math.round(height * 0.026)}px 'Hanken Grotesk', sans-serif`;
-        const metrics = ctx.measureText(voSnippet);
-        const pillW = metrics.width + 24;
-        const pillH = Math.round(height * 0.044);
-        ctx.fillStyle = "rgba(0,0,0,0.65)";
-        ctx.strokeStyle = "rgba(255,255,255,0.2)";
+        const sentences = effectiveScript.split(/[.!?]/).filter((s) => s.trim());
+        const currentSentence =
+          sentences[beatIndex % sentences.length]?.trim() || effectiveScript.slice(0, 60);
+
+        const subY = height - pad - 60;
+        ctx.font = `600 ${Math.round(height * 0.03)}px 'Hanken Grotesk', sans-serif`;
+        const metrics = ctx.measureText(currentSentence);
+        const subW = metrics.width + 36;
+        const subH = Math.round(height * 0.048);
+
+        ctx.fillStyle = "rgba(0, 0, 0, 0.78)";
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.22)";
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.roundRect((width - pillW) / 2, height - pad - 36, pillW, pillH, 6);
+        ctx.roundRect((width - subW) / 2, subY, subW, subH, 6);
         ctx.fill();
         ctx.stroke();
-        ctx.fillStyle = "#FFFFFF";
-        ctx.fillText(voSnippet, width / 2, height - pad - 36 + pillH / 2);
+
+        ctx.fillStyle = "#FFDD00"; // Signature YouTube CC Yellow
+        ctx.fillText(currentSentence, width / 2, subY + subH / 2);
         ctx.restore();
       }
 
-      // Progress Tracker Bar at Bottom
-      ctx.fillStyle = "rgba(255,255,255,0.2)";
-      ctx.fillRect(0, height - 6, width, 6);
-      ctx.fillStyle = "#10B981";
-      ctx.fillRect(0, height - 6, width * progress, 6);
+      // 6. Live Audio Waveform Visualizer Bars (YouTube Music/Podcast Style)
+      ctx.save();
+      const numBars = 24;
+      const barTotalW = width * 0.32;
+      const barW = barTotalW / numBars - 2;
+      const startX = width / 2 - barTotalW / 2;
+      const barBaseY = height - pad - 12;
+
+      for (let i = 0; i < numBars; i++) {
+        const energy = Math.abs(
+          Math.sin(timestamp * 0.008 + i * 0.4) * Math.cos(timestamp * 0.004 + i * 0.2)
+        );
+        const barH = 4 + energy * (height * 0.04);
+        ctx.fillStyle = `rgba(16, 185, 129, ${(0.4 + energy * 0.6).toFixed(2)})`;
+        ctx.fillRect(startX + i * (barW + 2), barBaseY - barH, barW, barH);
+      }
+      ctx.restore();
+
+      // 7. Interactive Procedural Character Host Avatar (LatentSync & TalkCraft)
+      if (enableCharacter) {
+        const isSpeaking = isPlayingCanvas || isAuditioning;
+        const audioEnergy = 0.5 + Math.sin(timestamp * 0.01) * 0.4;
+        const charW = Math.round(width * 0.28);
+        const charH = Math.round(height * 0.22);
+        const charX =
+          characterPosition === "pip_bottom_left"
+            ? pad + 16
+            : width - pad - charW - 16;
+        const charY = height - pad - charH - 24;
+
+        const charState: CharacterRenderState = {
+          timeMs: timestamp,
+          isSpeaking,
+          audioEnergy,
+          currentPhrase: activeBeat.label + " // " + brief.productName,
+          avatarId: selectedAvatar,
+          position: characterPosition,
+        };
+
+        drawCharacterAvatar(ctx, { x: charX, y: charY, width: charW, height: charH }, charState);
+      }
+
+      // 8. YouTube Video Scrub Line (Red Progress Bar at Bottom of Canvas)
+      ctx.fillStyle = "rgba(255, 255, 255, 0.25)";
+      ctx.fillRect(0, height - 5, width, 5);
+      ctx.fillStyle = "#FF0000"; // Signature YouTube Red
+      ctx.fillRect(0, height - 5, width * progress, 5);
+
+      // Red Seeker Knob
+      ctx.fillStyle = "#FF0000";
+      ctx.beginPath();
+      ctx.arc(width * progress, height - 2.5, 4, 0, Math.PI * 2);
+      ctx.fill();
 
       ctx.restore();
 
@@ -405,434 +509,632 @@ export function VideoStudioPlayer({
         animFrameRef.current = requestAnimationFrame(drawFrame);
       }
     },
-    [brief, isPlayingCanvas, effectiveScript, enableVoiceover]
+    [
+      brief,
+      durationMs,
+      effectiveScript,
+      enableCharacter,
+      enableVoiceover,
+      isAuditioning,
+      isPlayingCanvas,
+      selectedAvatar,
+      characterPosition,
+      showCaptions,
+    ]
   );
 
   useEffect(() => {
     if (isPlayingCanvas) {
       animFrameRef.current = requestAnimationFrame(drawFrame);
+      startSpeechNarration();
+    } else {
+      stopSpeechNarration();
     }
     return () => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
-  }, [drawFrame, isPlayingCanvas]);
+  }, [drawFrame, isPlayingCanvas, startSpeechNarration, stopSpeechNarration]);
+
+  const togglePlayback = () => {
+    setIsPlayingCanvas((prev) => !prev);
+  };
+
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const pct = Math.max(0, Math.min(1, clickX / rect.width));
+    setCurrentTimeSec(Math.round(pct * 8 * 10) / 10);
+  };
+
+  const handleRecordClientWebm = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    setIsRecordingWebm(true);
+    try {
+      const stream = canvas.captureStream(30);
+      const recorder = new MediaRecorder(stream, { mimeType: "video/webm" });
+      const chunks: Blob[] = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: "video/webm" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${slugify(brief.productName)}-youtube-ad.webm`;
+        a.click();
+        URL.revokeObjectURL(url);
+        setIsRecordingWebm(false);
+      };
+
+      recorder.start();
+      setTimeout(() => {
+        if (recorder.state !== "inactive") recorder.stop();
+      }, 5000);
+    } catch {
+      setIsRecordingWebm(false);
+    }
+  };
+
+  const activeVideo = videos[activeVideoIndex] ?? videos[0];
 
   return (
     <div className="space-y-4 font-sans">
-      {/* Recipe & Aspect Director Box */}
-      <div className="space-y-4 rounded-2xl border border-black/[0.08] bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] pb-3">
-          <div>
-            <h3 className="text-sm font-semibold text-[#1D1D1F]">
-              Video Studio &amp; Motion Kinetics
-            </h3>
-            <p className="mt-0.5 text-xs text-neutral-500">
-              Autonomous cinematic direction, Ken Burns framing &amp; AI voiceover
-            </p>
+      {/* 1. YouTube Video Studio Shell */}
+      <div className="overflow-hidden rounded-xl border border-black/10 bg-[#0F0F12] text-white shadow-xl">
+        {/* YouTube Top Bar Header */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-[#16161C] px-4 py-2.5">
+          <div className="flex items-center gap-3">
+            {/* Channel Avatar */}
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-tr from-[#FF0000] to-[#FF4E50] text-white shadow-md">
+              <Play className="h-4 w-4 fill-white" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-semibold text-sm text-white">Agent Pixelate Studios</span>
+                <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#10B981] text-[9px] font-black text-black">
+                  ✓
+                </span>
+                <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[10px] text-white/70">
+                  Ad · 0:15
+                </span>
+              </div>
+              <p className="font-mono text-[11px] text-white/50">1.48M subscribers • 124,580 views</p>
+            </div>
           </div>
 
-          {/* Aspect Switcher */}
-          <div className="inline-flex rounded-full bg-neutral-100 p-0.5">
+          {/* YouTube Interactive Actions */}
+          <div className="flex items-center gap-2">
+            {/* Subscribe Button */}
             <button
               type="button"
-              onClick={() => setAspectRatio("16:9")}
+              onClick={() => setIsSubscribed((s) => !s)}
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition",
-                aspectRatio === "16:9"
-                  ? "bg-white text-neutral-900 shadow-sm"
-                  : "text-neutral-500 hover:text-neutral-900"
+                "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-bold transition",
+                isSubscribed
+                  ? "bg-white/15 text-white hover:bg-white/25"
+                  : "bg-[#FF0000] text-white hover:bg-[#CC0000]"
               )}
             >
-              <Monitor className="h-3.5 w-3.5" />
-              <span>16:9 Cinema</span>
+              {isSubscribed ? (
+                <>
+                  <Bell className="h-3.5 w-3.5 fill-current" />
+                  <span>Subscribed</span>
+                </>
+              ) : (
+                <span>Subscribe</span>
+              )}
+            </button>
+
+            {/* Like / Dislike */}
+            <div className="flex items-center rounded-full bg-white/10 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLiked((l) => !l);
+                  if (!isLiked) {
+                    setIsDisliked(false);
+                    setLikeCount((c) => c + 1);
+                  } else {
+                    setLikeCount((c) => c - 1);
+                  }
+                }}
+                className={cn(
+                  "flex items-center gap-1 rounded-l-full px-3 py-1 font-mono transition hover:bg-white/10",
+                  isLiked && "text-[#10B981]"
+                )}
+              >
+                <ThumbsUp className="h-3.5 w-3.5" />
+                <span>{Math.round(likeCount / 1000)}K</span>
+              </button>
+              <div className="h-3.5 w-[1px] bg-white/20" />
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDisliked((d) => !d);
+                  if (!isDisliked) setIsLiked(false);
+                }}
+                className={cn(
+                  "rounded-r-full px-2.5 py-1 transition hover:bg-white/10",
+                  isDisliked && "text-red-400"
+                )}
+              >
+                <ThumbsDown className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            {/* Visit Advertiser Link */}
+            <a
+              href="#order"
+              onClick={(e) => {
+                e.preventDefault();
+                alert(`Redirecting to official ${brief.productName} promotional launch page.`);
+              }}
+              className="hidden sm:inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white hover:bg-white/20 transition"
+            >
+              <span>Visit Advertiser</span>
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+        </div>
+
+        {/* Video Canvas Stage with YouTube Red Scrubber */}
+        <div className="relative flex justify-center bg-black">
+          {activeVideo ? (
+            <video
+              key={activeVideo.videoUrl}
+              src={activeVideo.videoUrl}
+              controls
+              playsInline
+              autoPlay
+              loop
+              muted={isMuted}
+              className={cn(
+                "border border-white/10 bg-black",
+                activeVideo.aspectRatio === "9:16" ? "max-h-[460px] w-auto" : "aspect-video w-full"
+              )}
+            />
+          ) : (
+            <div className="relative w-full">
+              <canvas
+                ref={canvasRef}
+                width={aspectRatio === "9:16" ? 720 : 1280}
+                height={aspectRatio === "9:16" ? 1280 : 720}
+                className={cn(
+                  "cursor-pointer border border-white/10 bg-black",
+                  aspectRatio === "9:16" ? "mx-auto max-h-[460px] w-auto" : "aspect-video w-full"
+                )}
+                onClick={togglePlayback}
+              />
+
+              {/* Top-Right YouTube Watermark */}
+              <div className="pointer-events-none absolute top-3 right-4 flex items-center gap-1.5 rounded bg-black/60 px-2 py-0.5 font-mono text-[10px] text-white/80 backdrop-blur-sm">
+                <span className="h-2 w-2 rounded-full bg-red-600 animate-pulse" />
+                <span>4K 60FPS // YOUTUBE AD</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* YouTube Red Scrub Bar (Interactive) */}
+        <div
+          role="slider"
+          aria-valuenow={currentTimeSec}
+          aria-valuemin={0}
+          aria-valuemax={8}
+          tabIndex={0}
+          onClick={handleSeek}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowRight") setCurrentTimeSec((prev) => Math.min(8, prev + 1));
+            if (e.key === "ArrowLeft") setCurrentTimeSec((prev) => Math.max(0, prev - 1));
+          }}
+          className="group relative h-1.5 w-full cursor-pointer bg-white/20 transition-all hover:h-2.5"
+        >
+          {/* Loaded Buffer Line */}
+          <div className="absolute top-0 left-0 h-full w-[85%] bg-white/40" />
+          {/* Active Red Progress Line */}
+          <div
+            className="absolute top-0 left-0 h-full bg-[#FF0000] transition-all"
+            style={{ width: `${(currentTimeSec / 8) * 100}%` }}
+          />
+          {/* Seeker Knob */}
+          <div
+            className="absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full bg-[#FF0000] shadow-md opacity-0 group-hover:opacity-100 transition"
+            style={{ left: `calc(${(currentTimeSec / 8) * 100}% - 7px)` }}
+          />
+        </div>
+
+        {/* YouTube Bottom Player Controls Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-[#16161C] px-4 py-2 text-white">
+          <div className="flex items-center gap-3">
+            {/* Play / Pause */}
+            <button
+              type="button"
+              onClick={togglePlayback}
+              className="text-white hover:text-red-500 transition"
+              title={isPlayingCanvas ? "Pause (Space)" : "Play (Space)"}
+            >
+              {isPlayingCanvas ? <Pause className="h-5 w-5 fill-current" /> : <Play className="h-5 w-5 fill-current" />}
+            </button>
+
+            {/* Replay 10s */}
+            <button
+              type="button"
+              onClick={() => setCurrentTimeSec(0)}
+              className="text-white/70 hover:text-white transition"
+              title="Replay from start"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </button>
+
+            {/* Volume + Mute */}
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setIsMuted((m) => !m)}
+                className="text-white/80 hover:text-white transition"
+              >
+                {isMuted || volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+              </button>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={isMuted ? 0 : volume}
+                onChange={(e) => {
+                  setVolume(parseFloat(e.target.value));
+                  setIsMuted(false);
+                }}
+                className="h-1 w-16 cursor-pointer accent-[#FF0000]"
+              />
+            </div>
+
+            {/* Time Stamp */}
+            <span className="font-mono text-xs text-white/70">
+              0:0{Math.floor(currentTimeSec)} / 0:08
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* [CC] Closed Captions Toggle */}
+            <button
+              type="button"
+              onClick={() => setShowCaptions((c) => !c)}
+              className={cn(
+                "rounded px-1.5 py-0.5 font-mono text-xs font-bold transition",
+                showCaptions ? "border-b-2 border-red-500 text-white" : "text-white/40 hover:text-white"
+              )}
+              title="Toggle YouTube Subtitles [CC]"
+            >
+              [CC]
+            </button>
+
+            {/* Character Presenter Toggle */}
+            <button
+              type="button"
+              onClick={() => setEnableCharacter((c) => !c)}
+              className={cn(
+                "flex items-center gap-1 rounded-full px-2.5 py-0.5 font-mono text-xs transition",
+                enableCharacter
+                  ? "border border-[#10B981] bg-[#10B981]/20 text-[#10B981]"
+                  : "border border-white/20 text-white/50 hover:text-white"
+              )}
+            >
+              <User className="h-3 w-3" />
+              <span>Host: {enableCharacter ? selectedAvatar.toUpperCase() : "OFF"}</span>
+            </button>
+
+            {/* Settings Gear Pop-up */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowSettingsMenu((s) => !s)}
+                className="text-white/70 hover:text-white transition"
+              >
+                <Settings className="h-4 w-4" />
+              </button>
+
+              {showSettingsMenu && (
+                <div className="absolute bottom-8 right-0 z-50 w-56 space-y-2 rounded-xl border border-white/20 bg-[#1F1F28] p-3 text-xs shadow-2xl">
+                  <div className="border-b border-white/10 pb-1.5 font-bold uppercase text-white/70">
+                    Player Settings
+                  </div>
+
+                  {/* Playback Speed */}
+                  <div className="space-y-1">
+                    <span className="text-[11px] text-white/50">Playback Speed</span>
+                    <div className="grid grid-cols-4 gap-1 font-mono text-[10px]">
+                      {[0.75, 1.0, 1.25, 1.5].map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => {
+                            setPlaybackSpeed(s);
+                            setShowSettingsMenu(false);
+                          }}
+                          className={cn(
+                            "rounded py-0.5 transition",
+                            playbackSpeed === s ? "bg-[#FF0000] text-white font-bold" : "bg-white/10 text-white/70"
+                          )}
+                        >
+                          {s}x
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Character Avatar Picker */}
+                  <div className="space-y-1 pt-1">
+                    <span className="text-[11px] text-white/50">Character Presenter</span>
+                    <div className="grid grid-cols-2 gap-1 font-mono text-[10px]">
+                      {(["maya", "leo", "aria", "pixel"] as CharacterAvatarId[]).map((av) => (
+                        <button
+                          key={av}
+                          type="button"
+                          onClick={() => {
+                            setSelectedAvatar(av);
+                            setEnableCharacter(true);
+                          }}
+                          className={cn(
+                            "rounded py-0.5 uppercase transition",
+                            selectedAvatar === av
+                              ? "bg-[#10B981] text-black font-bold"
+                              : "bg-white/10 text-white/70"
+                          )}
+                        >
+                          {av}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Character Animation & AI Voiceover Studio Deck */}
+      <div className="space-y-3 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-100 pb-2.5">
+          <div className="flex items-center gap-2">
+            <User className="h-4 w-4 text-[#10B981]" />
+            <span className="text-xs font-semibold text-[#1D1D1F]">
+              AI Character Presenter &amp; Latent Lip-Sync
+            </span>
+            <span className="rounded bg-[#E6F7EB] px-2 py-0.5 text-[10px] font-medium text-[#10B981]">
+              Viseme Synced
+            </span>
+          </div>
+
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={() => setCharacterPosition("pip_bottom_right")}
+              className={cn(
+                "rounded-md border px-2.5 py-1 text-[11px] font-medium transition",
+                characterPosition === "pip_bottom_right"
+                  ? "border-neutral-900 bg-neutral-900 text-white"
+                  : "border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50"
+              )}
+            >
+              PiP Bottom-Right
             </button>
             <button
               type="button"
-              onClick={() => setAspectRatio("9:16")}
+              onClick={() => setCharacterPosition("pip_bottom_left")}
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition",
-                aspectRatio === "9:16"
-                  ? "bg-white text-neutral-900 shadow-sm"
-                  : "text-neutral-500 hover:text-neutral-900"
+                "rounded-md border px-2.5 py-1 text-[11px] font-medium transition",
+                characterPosition === "pip_bottom_left"
+                  ? "border-neutral-900 bg-neutral-900 text-white"
+                  : "border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50"
               )}
             >
-              <Smartphone className="h-3.5 w-3.5" />
-              <span>9:16 Reel</span>
+              PiP Bottom-Left
             </button>
           </div>
         </div>
 
-        {/* Shot Recipes Grid */}
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {SHOT_RECIPES.map((recipe) => {
-            const active = shotStyle === recipe.id;
+        {/* 4 Avatar Archetypes Grid */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {(Object.values(CHARACTER_AVATARS)).map((avatar) => {
+            const active = selectedAvatar === avatar.id && enableCharacter;
             return (
               <button
-                key={recipe.id}
+                key={avatar.id}
                 type="button"
-                onClick={() => setShotStyle(recipe.id)}
+                onClick={() => {
+                  setSelectedAvatar(avatar.id);
+                  setEnableCharacter(true);
+                }}
                 className={cn(
-                  "rounded-xl border p-2.5 text-left transition",
+                  "rounded-lg border p-2.5 text-left transition",
                   active
-                    ? "border-neutral-900 bg-neutral-900 text-white shadow-sm"
-                    : "border-black/[0.06] bg-[#FBFBFD] text-neutral-700 hover:bg-neutral-100/70"
+                    ? "border-neutral-900 bg-[#F5F5F7] ring-1 ring-neutral-900 shadow-sm"
+                    : "border-neutral-200 bg-white hover:bg-neutral-50"
                 )}
               >
-                <div className="flex items-center justify-between gap-1">
-                  <span className="truncate text-xs font-semibold">
-                    {recipe.label}
-                  </span>
+                <div className="flex items-center justify-between">
+                  <span className="truncate text-xs font-semibold text-[#1D1D1F]">{avatar.name}</span>
                   <span
-                    className={cn(
-                      "shrink-0 rounded px-1.5 py-0.5 text-[9px] font-medium",
-                      active
-                        ? "bg-white/20 text-white"
-                        : "bg-neutral-200/60 text-neutral-600"
-                    )}
-                  >
-                    {recipe.tag}
-                  </span>
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: avatar.themeColor }}
+                  />
                 </div>
-                <div
-                  className={cn(
-                    "mt-0.5 truncate text-[10px]",
-                    active ? "text-neutral-300" : "text-neutral-500"
-                  )}
-                >
-                  {recipe.curve}
-                </div>
+                <div className="mt-0.5 line-clamp-1 text-[10px] text-neutral-500">{avatar.role}</div>
+                <div className="mt-1 font-mono text-[9px] text-neutral-400">{avatar.accentBadge}</div>
               </button>
             );
           })}
         </div>
 
-        {/* AI Voiceover & Soundstage Console */}
-        <div className="rounded-xl border border-black/[0.06] bg-[#FBFBFD] p-3.5 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-neutral-900 text-white shadow-sm">
-                <Mic className="h-3.5 w-3.5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-[#1D1D1F]">
-                    AI Voiceover &amp; Soundstage
-                  </span>
-                  <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[9px] font-medium text-emerald-700">
-                    Studio Mixed
-                  </span>
-                </div>
-                <p className="text-[11px] text-neutral-500">
-                  Synchronized vocal narration mixed over cinematic audio score
-                </p>
-              </div>
+        {/* AI Voiceover & Narration Soundstage */}
+        <div className="rounded-lg border border-neutral-100 bg-[#FBFBFD] p-3 space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Mic className="h-4 w-4 text-neutral-700" />
+              <span className="text-xs font-semibold text-[#1D1D1F]">
+                AI Narration Voiceover
+              </span>
+              <span className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-[9px] text-neutral-600">
+                Web Speech Synced
+              </span>
             </div>
 
-            {/* Toggle Switch */}
-            <button
-              type="button"
-              onClick={() => setEnableVoiceover((v) => !v)}
-              className={cn(
-                "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200",
-                enableVoiceover ? "bg-[#0071E3]" : "bg-neutral-300"
-              )}
-              role="switch"
-              aria-checked={enableVoiceover}
-            >
-              <span
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleAuditionVoiceover}
                 className={cn(
-                  "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200",
-                  enableVoiceover ? "translate-x-4" : "translate-x-0.5"
+                  "inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition shadow-sm",
+                  isAuditioning
+                    ? "bg-[#D70015] text-white"
+                    : "border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50"
                 )}
-              />
-            </button>
+              >
+                {isAuditioning ? (
+                  <>
+                    <Square className="h-3 w-3 fill-current" />
+                    <span>Stop Speech</span>
+                  </>
+                ) : (
+                  <>
+                    <Volume2 className="h-3 w-3" />
+                    <span>Audition Voice</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowScriptDrawer((s) => !s)}
+                className="inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50 shadow-sm transition"
+              >
+                <FileText className="h-3 w-3" />
+                <span>{showScriptDrawer ? "Hide Script" : "Edit Script"}</span>
+              </button>
+            </div>
           </div>
 
-          {enableVoiceover && (
-            <div className="space-y-2.5 pt-1">
-              {/* Voice Preset Selector */}
-              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
-                {VOICEOVER_PRESETS.map((vp) => {
-                  const active = selectedVoice === vp.id;
-                  return (
-                    <button
-                      key={vp.id}
-                      type="button"
-                      onClick={() => setSelectedVoice(vp.id)}
-                      className={cn(
-                        "rounded-xl border p-2 text-left transition",
-                        active
-                          ? "border-neutral-900 bg-white text-neutral-900 shadow-sm ring-1 ring-neutral-900"
-                          : "border-black/[0.06] bg-white text-neutral-700 hover:bg-neutral-50"
-                      )}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold">{vp.label}</span>
-                        <span className="text-[9px] font-medium text-neutral-400">
-                          {vp.tag}
-                        </span>
-                      </div>
-                      <p className="mt-0.5 line-clamp-1 text-[10px] text-neutral-500">
-                        {vp.desc}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Audition & Script Edit Actions */}
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/[0.04] pt-2">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleAuditionVoiceover}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition",
-                      isAuditioning
-                        ? "bg-rose-50 text-rose-700 border border-rose-200"
-                        : "border border-black/[0.08] bg-white text-neutral-700 hover:bg-neutral-50"
-                    )}
-                  >
-                    {isAuditioning ? (
-                      <>
-                        <Square className="h-3 w-3 fill-current" />
-                        <span>Stop Audition</span>
-                      </>
-                    ) : (
-                      <>
-                        <Volume2 className="h-3 w-3" />
-                        <span>Audition Voice</span>
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowScriptDrawer((s) => !s)}
-                    className="inline-flex items-center gap-1 rounded-full border border-black/[0.08] bg-white px-3 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
-                  >
-                    <FileText className="h-3 w-3" />
-                    <span>{showScriptDrawer ? "Hide Script" : "Edit Script"}</span>
-                  </button>
-                </div>
-
-                <span className="text-[11px] text-neutral-400">
-                  4-Beat Directors&apos; Cadence
-                </span>
-              </div>
-
-              {/* Script Drawer */}
-              {showScriptDrawer && (
-                <div className="space-y-2 rounded-xl border border-black/[0.06] bg-white p-3 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-neutral-700">
-                      Voiceover Narration Script
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setVoiceoverScript("")}
-                      className="inline-flex items-center gap-1 text-[11px] text-neutral-400 hover:text-neutral-700"
-                    >
-                      <RotateCcw className="h-3 w-3" />
-                      <span>Reset</span>
-                    </button>
+          {/* Voice Presets */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {VOICEOVER_PRESETS.map((vp) => {
+              const active = selectedVoice === vp.id;
+              return (
+                <button
+                  key={vp.id}
+                  type="button"
+                  onClick={() => setSelectedVoice(vp.id)}
+                  className={cn(
+                    "rounded-md border p-2 text-left transition",
+                    active
+                      ? "border-neutral-900 bg-white shadow-sm ring-1 ring-neutral-900"
+                      : "border-neutral-200 bg-white hover:bg-neutral-50"
+                  )}
+                >
+                  <div className="flex items-center justify-between text-xs font-semibold text-[#1D1D1F]">
+                    <span>{vp.label}</span>
                   </div>
-                  <textarea
-                    rows={3}
-                    value={voiceoverScript || defaultVoiceoverScript}
-                    onChange={(e) => setVoiceoverScript(e.target.value)}
-                    className="w-full rounded-lg border border-black/[0.08] p-2 text-xs text-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-400"
-                    placeholder="Enter narration script..."
-                  />
-                </div>
-              )}
+                  <p className="mt-0.5 line-clamp-1 text-[10px] text-neutral-500">{vp.desc}</p>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Script Drawer */}
+          {showScriptDrawer && (
+            <div className="space-y-2 border-t border-neutral-200 pt-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-neutral-700">Voiceover Script</span>
+                <button
+                  type="button"
+                  onClick={() => setVoiceoverScript("")}
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-neutral-500 hover:text-neutral-900"
+                >
+                  <RotateCcw className="h-2.5 w-2.5" />
+                  <span>Reset to AI default</span>
+                </button>
+              </div>
+              <textarea
+                rows={3}
+                value={voiceoverScript || defaultVoiceoverScript}
+                onChange={(e) => setVoiceoverScript(e.target.value)}
+                className="w-full rounded-md border border-neutral-200 p-2 font-mono text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                placeholder="Enter narration script..."
+              />
             </div>
           )}
         </div>
 
         {/* Render CTAs */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-black/[0.06] pt-3">
-          <span className="text-xs text-neutral-500">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-100 pt-2">
+          <span className="font-mono text-xs text-neutral-500">
             {isLiveBackend && campaignId
-              ? "FastAPI orchestrator renders 24fps H.264 MP4 with FFmpeg & audio"
-              : "Autonomous cinematic engine with AI voiceover and soundstage"}
+              ? "FastAPI orchestrator renders beat-synced H.264 MP4 with FFmpeg & character overlays"
+              : "60fps Canvas Kinetic Preview with WebM capture & synchronized voiceover"}
           </span>
 
-          <button
-            type="button"
-            disabled={isRenderingCut}
-            onClick={() =>
-              onRenderCustomCut(aspectRatio, shotStyle, {
-                enableVoiceover,
-                voice: selectedVoice,
-                voiceoverScript: effectiveScript,
-              })
-            }
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#0071E3] px-5 py-2 text-xs font-medium text-white shadow-sm transition hover:bg-[#0077ED] active:scale-[0.99] disabled:opacity-50"
-          >
-            {isRenderingCut ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                <span>Rendering Cut...</span>
-              </>
+          <div className="flex items-center gap-2">
+            {isLiveBackend && campaignId ? (
+              <button
+                type="button"
+                disabled={isRenderingCut}
+                onClick={() =>
+                  onRenderCustomCut(aspectRatio, shotStyle, {
+                    enableVoiceover,
+                    voice: selectedVoice,
+                    voiceoverScript: effectiveScript,
+                    enableCharacter,
+                    characterAvatar: selectedAvatar,
+                    characterPosition,
+                  })
+                }
+                className="inline-flex items-center gap-1.5 rounded-full bg-neutral-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-neutral-800 shadow-sm transition disabled:opacity-50"
+              >
+                {isRenderingCut ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>RENDERING MP4...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-3.5 w-3.5 text-[#10B981]" />
+                    <span>
+                      RENDER {aspectRatio} MP4{enableCharacter ? ` + Host ${selectedAvatar.toUpperCase()}` : ""}
+                    </span>
+                  </>
+                )}
+              </button>
             ) : (
-              <>
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>
-                  Render {aspectRatio === "9:16" ? "9:16 Reel" : "16:9 Cinema Cut"}
-                  {enableVoiceover ? " + VO" : ""}
-                </span>
-              </>
+              <button
+                type="button"
+                disabled={isRecordingWebm}
+                onClick={handleRecordClientWebm}
+                className="inline-flex items-center gap-1.5 rounded-full bg-neutral-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-neutral-800 shadow-sm transition disabled:opacity-50"
+              >
+                {isRecordingWebm ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>RECORDING 5S WEBM...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-3.5 w-3.5" />
+                    <span>SAVE .WEBM</span>
+                  </>
+                )}
+              </button>
             )}
-          </button>
+          </div>
         </div>
 
         {renderError && (
-          <p className="text-xs font-medium text-rose-600">{renderError}</p>
+          <p className="font-mono text-xs font-bold text-red-500">{renderError}</p>
         )}
-      </div>
-
-      {/* Main Video Stage */}
-      {activeVideo ? (
-        <div className="space-y-3">
-          <div className="overflow-hidden rounded-2xl border border-black/[0.08] bg-black shadow-lg">
-            <div className="flex items-center justify-between border-b border-white/10 bg-neutral-900/90 px-4 py-3">
-              <div className="flex items-center gap-2.5">
-                <Radio className="h-3.5 w-3.5 text-[#0071E3]" />
-                <span className="truncate text-xs font-semibold text-white">
-                  {activeVideo.title}
-                </span>
-                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-neutral-300">
-                  H.264 · {activeVideo.aspectRatio}
-                </span>
-              </div>
-              <a
-                href={activeVideo.videoUrl}
-                download={`${slugify(activeVideo.title)}.mp4`}
-                className="inline-flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 px-3 py-1 text-xs font-medium text-white transition"
-              >
-                <Download className="h-3.5 w-3.5" />
-                <span>Download MP4</span>
-              </a>
-            </div>
-
-            <div className="flex justify-center bg-black p-2">
-              <video
-                key={activeVideo.videoUrl}
-                src={activeVideo.videoUrl}
-                controls
-                playsInline
-                autoPlay
-                loop
-                muted
-                className={cn(
-                  "rounded-lg bg-black shadow-inner",
-                  activeVideo.aspectRatio === "9:16"
-                    ? "max-h-[460px] aspect-[9/16] w-auto"
-                    : "aspect-video w-full"
-                )}
-              />
-            </div>
-          </div>
-
-          {/* Generated Cuts Switcher */}
-          {videos.length > 1 && (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-medium text-neutral-500 mr-1">Cuts:</span>
-              {videos.map((vid, idx) => (
-                <button
-                  key={vid.id}
-                  type="button"
-                  onClick={() => setActiveVideoIndex(idx)}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition",
-                    idx === activeVideoIndex
-                      ? "bg-neutral-900 text-white shadow-sm"
-                      : "border border-black/[0.08] bg-white text-neutral-700 hover:bg-neutral-100/70"
-                  )}
-                >
-                  <Film className="h-3.5 w-3.5" />
-                  <span>
-                    Cut 0{idx + 1} · {vid.aspectRatio}
-                  </span>
-                  {(vid.hasVoiceover ||
-                    vid.title.includes("VO:") ||
-                    vid.promptSummary?.includes("VO:")) && (
-                    <span className="inline-flex items-center gap-0.5 rounded-full bg-neutral-200/60 px-1.5 py-0.2 text-[9px] text-neutral-700">
-                      <Mic className="h-2.5 w-2.5" />
-                      <span>VO</span>
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : (
-        /* Real-time Canvas Stage */
-        <div className="overflow-hidden rounded-2xl border border-black/[0.08] bg-black shadow-lg">
-          <div className="flex items-center justify-between border-b border-white/10 bg-neutral-900/90 px-4 py-3">
-            <div className="flex items-center gap-2">
-              <Film className="h-4 w-4 text-[#0071E3]" />
-              <span className="text-xs font-medium text-white">
-                Real-Time Motion Canvas Preview (60 FPS)
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsPlayingCanvas((p) => !p)}
-              className="rounded-full bg-white/10 hover:bg-white/20 p-1.5 text-white transition"
-            >
-              {isPlayingCanvas ? (
-                <Pause className="h-3.5 w-3.5" />
-              ) : (
-                <Play className="h-3.5 w-3.5" />
-              )}
-            </button>
-          </div>
-
-          <div className="flex justify-center bg-black p-2">
-            <canvas
-              ref={canvasRef}
-              width={aspectRatio === "9:16" ? 720 : 1280}
-              height={aspectRatio === "9:16" ? 1280 : 720}
-              className={cn(
-                "rounded-lg bg-black",
-                aspectRatio === "9:16"
-                  ? "max-h-[460px] aspect-[9/16] w-auto"
-                  : "aspect-video w-full"
-              )}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Director Beats Spec Grid */}
-      <div className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
-        <div className="border-b border-black/[0.06] pb-2 text-xs font-semibold text-[#1D1D1F]">
-          Director Shot Choreography &amp; Beats
-        </div>
-        <div className="grid grid-cols-2 gap-2 pt-3 sm:grid-cols-4">
-          {DIRECTOR_BEATS.map((beat) => (
-            <div
-              key={beat.beat}
-              className="rounded-xl border border-black/[0.06] bg-[#FBFBFD] p-3 text-xs"
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-neutral-800">
-                  Beat {beat.beat}
-                </span>
-                <span className="text-[10px] text-neutral-400">{beat.window}</span>
-              </div>
-              <div className="mt-1 font-medium text-neutral-900">
-                {beat.label}
-              </div>
-              <div className="mt-0.5 text-[11px] text-neutral-500">
-                {beat.move}
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );

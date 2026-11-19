@@ -129,6 +129,9 @@ class VideoRenderSpec:
     enable_voiceover: bool = True
     voice: str = "auto"
     voiceover_script: str | None = None
+    enable_character: bool = True
+    character_avatar: str = "maya"
+    character_position: str = "pip_bottom_right"
 
 
 # ---------------------------------------------------------------------------
@@ -1126,6 +1129,152 @@ def _paste_ken_burns_hero_card(
     canvas.paste(card, (paste_x, paste_y), card)
 
 
+def _draw_character_host_overlay(
+    overlay: ImageDraw.ImageDraw,
+    *,
+    t: float,
+    duration: float,
+    width: int,
+    height: int,
+    pad: int,
+    avatar: str,
+    fonts: dict[str, ImageFont.FreeTypeFont | ImageFont.ImageFont],
+    accent_rgb: tuple[int, int, int],
+    is_vertical: bool,
+) -> None:
+    """Render procedural animated character host avatar with lip-sync visemes and VU meter (LatentSync / TalkCraft)."""
+    card_w = int(width * 0.32) if is_vertical else int(width * 0.24)
+    card_h = int(height * 0.16) if is_vertical else int(height * 0.20)
+    cx0 = width - pad - card_w - 6
+    cy0 = height - pad - card_h - 22
+    cx1 = cx0 + card_w
+    cy1 = cy0 + card_h
+
+    # Card backdrop & accent border
+    overlay.rounded_rectangle(
+        (cx0, cy0, cx1, cy1),
+        radius=10,
+        fill=(10, 13, 20, 220),
+        outline=(*accent_rgb, 200),
+        width=2,
+    )
+
+    # Avatar Head Coordinates
+    head_cx = cx0 + int(card_h * 0.46)
+    head_cy = cy0 + int(card_h * 0.54)
+    head_r = int(card_h * 0.32)
+
+    # Blinking & mouth viseme calculation
+    blink_cycle = (t * 1000) % 3600
+    is_blinking = blink_cycle < 160
+    mouth_cycle = int((t * 1000 * 0.012) % 4)
+
+    # Render head circle
+    skin_col = (236, 198, 149) if avatar in ("leo", "aria") else (245, 208, 197)
+    overlay.ellipse(
+        (head_cx - head_r, head_cy - head_r, head_cx + head_r, head_cy + head_r),
+        fill=skin_col,
+    )
+
+    # Hair / Cyber Visor
+    if avatar == "pixel":
+        overlay.rectangle(
+            (head_cx - head_r, head_cy - head_r, head_cx + head_r, head_cy + head_r),
+            fill=(30, 30, 46),
+            outline=(236, 72, 153),
+            width=2,
+        )
+    elif avatar == "maya":
+        overlay.rounded_rectangle(
+            (head_cx - head_r - 2, head_cy - 8, head_cx + head_r + 2, head_cy + 4),
+            radius=3,
+            fill=(6, 182, 212, 180),
+            outline=(*accent_rgb, 255),
+            width=1,
+        )
+    elif avatar == "leo":
+        overlay.arc(
+            (head_cx - head_r - 4, head_cy - head_r - 4, head_cx + head_r + 4, head_cy + head_r + 4),
+            start=180,
+            end=0,
+            fill=(24, 24, 27),
+            width=4,
+        )
+        overlay.rectangle((head_cx - head_r - 5, head_cy - 8, head_cx - head_r, head_cy + 8), fill=(*accent_rgb, 240))
+        overlay.rectangle((head_cx + head_r, head_cy - 8, head_cx + head_r + 5, head_cy + 8), fill=(*accent_rgb, 240))
+
+    # Eyes
+    if not is_blinking:
+        overlay.ellipse((head_cx - 8, head_cy - 3, head_cx - 4, head_cy + 1), fill=(17, 24, 39))
+        overlay.ellipse((head_cx + 4, head_cy - 3, head_cx + 8, head_cy + 1), fill=(17, 24, 39))
+
+    # Mouth Viseme
+    mouth_y = head_cy + int(head_r * 0.45)
+    if mouth_cycle == 0:
+        overlay.ellipse((head_cx - 6, mouth_y - 4, head_cx + 6, mouth_y + 4), fill=(153, 27, 27))
+    elif mouth_cycle == 1:
+        overlay.ellipse((head_cx - 4, mouth_y - 4, head_cx + 4, mouth_y + 4), fill=(153, 27, 27))
+    elif mouth_cycle == 2:
+        overlay.rounded_rectangle((head_cx - 7, mouth_y - 2, head_cx + 7, mouth_y + 3), radius=2, fill=(153, 27, 27))
+    else:
+        overlay.line((head_cx - 5, mouth_y, head_cx + 5, mouth_y), fill=(153, 27, 27), width=2)
+
+    # Label text & VU meter
+    name_str = f"HOST // {avatar.upper()}"
+    tx = head_cx + head_r + 10
+    overlay.text((tx, cy0 + 10), name_str, font=fonts["mono_sm"], fill=(255, 255, 255, 240))
+    overlay.text((tx, cy0 + 26), "AI ADVERTISER", font=fonts["mono_sm"], fill=(*accent_rgb, 200))
+
+    # Live VU meter bars
+    vu_x = cx1 - 32
+    vu_y = cy0 + 16
+    for i in range(4):
+        bar_h = 3 + int(abs(math.sin(t * 12.0 + i * 1.2)) * 12)
+        overlay.rectangle((vu_x + i * 6, vu_y - bar_h // 2, vu_x + i * 6 + 3, vu_y + bar_h // 2), fill=(*accent_rgb, 230))
+
+
+def _draw_youtube_ad_chrome_overlay(
+    overlay: ImageDraw.ImageDraw,
+    *,
+    t: float,
+    duration: float,
+    width: int,
+    height: int,
+    pad: int,
+    fonts: dict[str, ImageFont.FreeTypeFont | ImageFont.ImageFont],
+    spec: VideoRenderSpec,
+    accent_rgb: tuple[int, int, int],
+) -> None:
+    """Render YouTube-styled ad player indicators (Red scrub bar, Ad 0:15 pill, visit advertiser CTA)."""
+    yt_y = pad + 10
+    yt_x = pad + 14
+    overlay.rounded_rectangle(
+        (yt_x, yt_y, yt_x + 92, yt_y + 24),
+        radius=4,
+        fill=(0, 0, 0, 180),
+        outline=(255, 255, 255, 40),
+        width=1,
+    )
+    overlay.ellipse((yt_x + 8, yt_y + 8, yt_x + 16, yt_y + 16), fill=(250, 204, 21))
+    overlay.text((yt_x + 22, yt_y + 5), "Ad · 0:15", font=fonts["mono_sm"], fill=(255, 255, 255, 240))
+
+    adv_x = yt_x + 102
+    overlay.rounded_rectangle(
+        (adv_x, yt_y, adv_x + 138, yt_y + 24),
+        radius=4,
+        fill=(255, 255, 255, 220),
+    )
+    overlay.text((adv_x + 10, yt_y + 5), "Visit advertiser →", font=fonts["mono_sm"], fill=(0, 0, 0, 240))
+
+    # YouTube Red Scrub line at the bottom
+    progress = _clamp01(t / duration)
+    bar_y = height - 6
+    overlay.rectangle((0, bar_y, width, height), fill=(255, 255, 255, 60))
+    overlay.rectangle((0, bar_y, int(width * progress), height), fill=(255, 0, 0, 255))
+    knob_x = int(width * progress)
+    overlay.ellipse((knob_x - 5, bar_y - 3, knob_x + 5, bar_y + 7), fill=(255, 0, 0, 255))
+
+
 # ---------------------------------------------------------------------------
 # Precomputed Typography & Layout Geometry for Ultra-Fast Frame Streaming
 # ---------------------------------------------------------------------------
@@ -1664,6 +1813,34 @@ def _render_frame(
             is_light_ground=is_light_ground,
             alpha=int(235 * sub_fade),
         )
+
+    # 4c. Procedural Character Host Avatar (LatentSync & TalkCraft)
+    if spec.enable_character:
+        _draw_character_host_overlay(
+            overlay,
+            t=t,
+            duration=duration,
+            width=width,
+            height=height,
+            pad=pad,
+            avatar=spec.character_avatar,
+            fonts=fonts,
+            accent_rgb=accent_rgb,
+            is_vertical=is_vertical,
+        )
+
+    # 4d. YouTube Ad Chrome & Scrub Bar
+    _draw_youtube_ad_chrome_overlay(
+        overlay,
+        t=t,
+        duration=duration,
+        width=width,
+        height=height,
+        pad=pad,
+        fonts=fonts,
+        spec=spec,
+        accent_rgb=accent_rgb,
+    )
 
     # 5. Bottom Progress Timeline Bar + Beat Notch Markers
     bar_y = height - pad - 14

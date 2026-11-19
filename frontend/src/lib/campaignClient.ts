@@ -296,59 +296,59 @@ function adaptBackendCampaignToAssets(
   const creatives: VisualCreative[] =
     rawImageAssets.length > 0
       ? rawImageAssets.map((asset, idx) => {
-          const resolvedUrl = asset.asset_url.startsWith("http")
-            ? asset.asset_url
-            : `${apiBase}${asset.asset_url.startsWith("/") ? "" : "/"}${asset.asset_url}`;
-          const platform = formatPlatformLabel(asset.platform);
-          const fallbackCreative = fallback.creatives[idx % fallback.creatives.length];
-          return {
-            id: asset.asset_id || `${backend.campaign_id}-vis-${idx + 1}`,
-            title: asset.title,
-            subtitle: `${platform} Concept · Persisted Campaign Asset`,
-            format: `${asset.aspect_ratio || "1:1"} Studio Render`,
-            aspectRatio: normalizeAspect(asset.aspect_ratio),
-            platform,
-            imageUrl: resolvedUrl,
-            options: (asset as { options?: VisualCreative["options"] }).options || fallbackCreative?.options,
-            headline: (asset as { headline?: string }).headline || fallbackCreative?.headline,
-            tagline: (asset as { tagline?: string }).tagline || fallbackCreative?.tagline,
-            badge: (asset as { badge?: string }).badge || fallbackCreative?.badge,
-            ctaText: (asset as { ctaText?: string }).ctaText || fallbackCreative?.ctaText,
-            features: (asset as { features?: string[] }).features || fallbackCreative?.features,
-            posterTheme: (asset as { posterTheme?: VisualCreative["posterTheme"] }).posterTheme || fallbackCreative?.posterTheme || "billboard",
-            lighting:
-              fallbackCreative?.lighting ??
-              "Studio dual-axis rim lighting",
-            composition:
-              visual?.typography_direction ||
-              fallbackCreative?.composition ||
-              "Balanced modular editorial layout with crisp negative space",
-            artNote: visual?.creative_direction || fallback.artDirectionSummary,
-            promptSummary:
-              asset.prompt_used ||
-              visual?.creative_direction ||
-              fallback.artDirectionSummary,
-          };
-        })
+        const resolvedUrl = asset.asset_url.startsWith("http")
+          ? asset.asset_url
+          : `${apiBase}${asset.asset_url.startsWith("/") ? "" : "/"}${asset.asset_url}`;
+        const platform = formatPlatformLabel(asset.platform);
+        const fallbackCreative = fallback.creatives[idx % fallback.creatives.length];
+        return {
+          id: asset.asset_id || `${backend.campaign_id}-vis-${idx + 1}`,
+          title: asset.title,
+          subtitle: `${platform} Concept · Persisted Campaign Asset`,
+          format: `${asset.aspect_ratio || "1:1"} Studio Render`,
+          aspectRatio: normalizeAspect(asset.aspect_ratio),
+          platform,
+          imageUrl: resolvedUrl,
+          options: (asset as { options?: VisualCreative["options"] }).options || fallbackCreative?.options,
+          headline: (asset as { headline?: string }).headline || fallbackCreative?.headline,
+          tagline: (asset as { tagline?: string }).tagline || fallbackCreative?.tagline,
+          badge: (asset as { badge?: string }).badge || fallbackCreative?.badge,
+          ctaText: (asset as { ctaText?: string }).ctaText || fallbackCreative?.ctaText,
+          features: (asset as { features?: string[] }).features || fallbackCreative?.features,
+          posterTheme: (asset as { posterTheme?: VisualCreative["posterTheme"] }).posterTheme || fallbackCreative?.posterTheme || "billboard",
+          lighting:
+            fallbackCreative?.lighting ??
+            "Studio dual-axis rim lighting",
+          composition:
+            visual?.typography_direction ||
+            fallbackCreative?.composition ||
+            "Balanced modular editorial layout with crisp negative space",
+          artNote: visual?.creative_direction || fallback.artDirectionSummary,
+          promptSummary:
+            asset.prompt_used ||
+            visual?.creative_direction ||
+            fallback.artDirectionSummary,
+        };
+      })
       : fallback.creatives;
 
   const handoff: ContextHandoffPayload | null = visual
     ? {
-        fromAgent: "@VisualAgent",
-        toAgent: "@CopyAgent",
-        visualConcept: visual.creative_direction,
-        dominantMood:
-          (visual.mood_keywords && visual.mood_keywords.join(" · ")) ||
-          `${brief.brandTone} · Editorial`,
-        paletteHexes,
-        heroMotif:
-          visual.typography_direction ||
-          `${brief.productName} hero studio lockup`,
-        messagingDirectives: [
-          visual.creative_direction,
-          `Band Memory ID: ${visual.band_memory_id || "room_shared_context"}`,
-        ],
-      }
+      fromAgent: "@VisualAgent",
+      toAgent: "@CopyAgent",
+      visualConcept: visual.creative_direction,
+      dominantMood:
+        (visual.mood_keywords && visual.mood_keywords.join(" · ")) ||
+        `${brief.brandTone} · Editorial`,
+      paletteHexes,
+      heroMotif:
+        visual.typography_direction ||
+        `${brief.productName} hero studio lockup`,
+      messagingDirectives: [
+        visual.creative_direction,
+        `Band Memory ID: ${visual.band_memory_id || "room_shared_context"}`,
+      ],
+    }
     : fallback.handoff;
 
   const socialPosts: SocialPost[] = [];
@@ -839,8 +839,8 @@ export function launchCampaignSession(
                 : eventTypeRaw === "agent_error"
                   ? "error"
                   : eventTypeRaw === "asset_generated" ||
-                      eventTypeRaw === "visual_completed" ||
-                      eventTypeRaw === "copy_completed"
+                    eventTypeRaw === "visual_completed" ||
+                    eventTypeRaw === "copy_completed"
                     ? "asset_ready"
                     : eventTypeRaw === "agent_thinking"
                       ? "thought"
@@ -856,8 +856,8 @@ export function launchCampaignSession(
             title: mapBackendEventTitle(eventTypeRaw, sender),
             message: String(
               parsed.message ||
-                parsed.thought ||
-                "Processing multi-agent step..."
+              parsed.thought ||
+              "Processing multi-agent step..."
             ),
           });
 
@@ -1304,51 +1304,51 @@ export function buildDefaultBandRoomState(
   const criticReport: BandCriticReport | null =
     status === "completed"
       ? {
-          reportId: `qa_${cid.slice(-6)}`,
-          overallScore: 96,
-          grade: "A+",
-          summary:
-            "Brand QA passed (96/100, Grade A+) — WCAG AAA contrast (14.2:1), zero copy clichés, and full asset-copy pairing verified.",
-          wcagContrastRatio: 14.2,
-          checks: [
-            {
-              category: "contrast_wcag",
-              label: "WCAG 2.1 Palette Contrast",
-              passed: true,
-              score: 98,
-              detail: "Peak contrast ratio 14.2:1 across 5 tokens (exceeds WCAG AAA 7:1).",
-            },
-            {
-              category: "palette_harmony",
-              label: "Visual System & Multi-Aspect Coverage",
-              passed: true,
-              score: 96,
-              detail: "5 brand hex tokens synchronized across 3 aspect-adapted creatives.",
-            },
-            {
-              category: "copy_conversion",
-              label: "Conversion Craft & Anti-Cliché Gate",
-              passed: true,
-              score: 97,
-              detail: "Zero banned clichés detected across Instagram, LinkedIn & Meta Ad decks.",
-            },
-            {
-              category: "platform_spec",
-              label: "Asset-to-Copy Visual Pairing",
-              passed: true,
-              score: 96,
-              detail: "All channel copy blocks explicitly linked to @visual_pixelate asset IDs.",
-            },
-            {
-              category: "guardrails",
-              label: "Shared BAND Guardrail Compliance",
-              passed: true,
-              score: 95,
-              detail: "All pinned BAND Memory guidelines hydrated into agent focus windows.",
-            },
-          ],
-          recommendedMention: null,
-        }
+        reportId: `qa_${cid.slice(-6)}`,
+        overallScore: 96,
+        grade: "A+",
+        summary:
+          "Brand QA passed (96/100, Grade A+) — WCAG AAA contrast (14.2:1), zero copy clichés, and full asset-copy pairing verified.",
+        wcagContrastRatio: 14.2,
+        checks: [
+          {
+            category: "contrast_wcag",
+            label: "WCAG 2.1 Palette Contrast",
+            passed: true,
+            score: 98,
+            detail: "Peak contrast ratio 14.2:1 across 5 tokens (exceeds WCAG AAA 7:1).",
+          },
+          {
+            category: "palette_harmony",
+            label: "Visual System & Multi-Aspect Coverage",
+            passed: true,
+            score: 96,
+            detail: "5 brand hex tokens synchronized across 3 aspect-adapted creatives.",
+          },
+          {
+            category: "copy_conversion",
+            label: "Conversion Craft & Anti-Cliché Gate",
+            passed: true,
+            score: 97,
+            detail: "Zero banned clichés detected across Instagram, LinkedIn & Meta Ad decks.",
+          },
+          {
+            category: "platform_spec",
+            label: "Asset-to-Copy Visual Pairing",
+            passed: true,
+            score: 96,
+            detail: "All channel copy blocks explicitly linked to @visual_pixelate asset IDs.",
+          },
+          {
+            category: "guardrails",
+            label: "Shared BAND Guardrail Compliance",
+            passed: true,
+            score: 95,
+            detail: "All pinned BAND Memory guidelines hydrated into agent focus windows.",
+          },
+        ],
+        recommendedMention: null,
+      }
       : null;
 
   return {
@@ -1473,37 +1473,37 @@ function adaptBandRoomSnapshot(raw: any): BandRoomState {
     })),
     loopGuard: raw.loop_guard
       ? {
-          maxAgentHops: raw.loop_guard.max_agent_hops,
-          currentHops: raw.loop_guard.current_hops,
-          blockedLoops: raw.loop_guard.blocked_loops,
-          strictMode: Boolean(raw.loop_guard.strict_mode),
-          circuitOpen: Boolean(raw.loop_guard.circuit_open),
-          lastRoute: raw.loop_guard.last_route || "",
-        }
+        maxAgentHops: raw.loop_guard.max_agent_hops,
+        currentHops: raw.loop_guard.current_hops,
+        blockedLoops: raw.loop_guard.blocked_loops,
+        strictMode: Boolean(raw.loop_guard.strict_mode),
+        circuitOpen: Boolean(raw.loop_guard.circuit_open),
+        lastRoute: raw.loop_guard.last_route || "",
+      }
       : {
-          maxAgentHops: 6,
-          currentHops: 0,
-          blockedLoops: 0,
-          strictMode: true,
-          circuitOpen: false,
-          lastRoute: "",
-        },
+        maxAgentHops: 6,
+        currentHops: 0,
+        blockedLoops: 0,
+        strictMode: true,
+        circuitOpen: false,
+        lastRoute: "",
+      },
     criticReport: raw.critic_report
       ? {
-          reportId: raw.critic_report.report_id,
-          overallScore: raw.critic_report.overall_score,
-          grade: raw.critic_report.grade,
-          summary: raw.critic_report.summary,
-          wcagContrastRatio: raw.critic_report.wcag_contrast_ratio,
-          checks: (raw.critic_report.checks || []).map((c: any) => ({
-            category: c.category,
-            label: c.label,
-            passed: Boolean(c.passed),
-            score: c.score,
-            detail: c.detail,
-          })),
-          recommendedMention: raw.critic_report.recommended_mention,
-        }
+        reportId: raw.critic_report.report_id,
+        overallScore: raw.critic_report.overall_score,
+        grade: raw.critic_report.grade,
+        summary: raw.critic_report.summary,
+        wcagContrastRatio: raw.critic_report.wcag_contrast_ratio,
+        checks: (raw.critic_report.checks || []).map((c: any) => ({
+          category: c.category,
+          label: c.label,
+          passed: Boolean(c.passed),
+          score: c.score,
+          detail: c.detail,
+        })),
+        recommendedMention: raw.critic_report.recommended_mention,
+      }
       : null,
     auditChainHead: raw.audit_chain_head || "",
   };

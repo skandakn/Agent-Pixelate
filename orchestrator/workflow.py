@@ -1947,6 +1947,9 @@ class CampaignCoordinator:
         enable_voiceover: bool = True,
         voice: str = "auto",
         voiceover_script: str | None = None,
+        enable_character: bool = True,
+        character_avatar: str = "maya",
+        character_position: str = "pip_bottom_right",
     ) -> VisualAsset:
         req = campaign.request
         style_meta = SHOT_STYLES.get(shot_style, SHOT_STYLES["obsidian_cinema"])
@@ -2000,6 +2003,9 @@ class CampaignCoordinator:
             enable_voiceover=enable_voiceover,
             voice=voice,
             voiceover_script=voiceover_script,
+            enable_character=enable_character,
+            character_avatar=character_avatar,
+            character_position=character_position,
         )
         shot_list = build_directors_shot_list(spec)
 
@@ -2009,9 +2015,10 @@ class CampaignCoordinator:
         width, height = (540, 960) if aspect_ratio == "9:16" else (960, 540)
         beats_summary = " → ".join(f"{s['beat']} {s['name']}" for s in shot_list)
         vo_tag = f" · VO: {voice.upper()}" if enable_voiceover and voice != "none" else ""
+        char_tag = f" · Host: {character_avatar.capitalize()}" if enable_character else ""
         return VisualAsset(
             asset_id=asset_id,
-            title=f"{req.brand_name} — {style_meta['label']} Promo ({aspect_ratio}{vo_tag})",
+            title=f"{req.brand_name} — {style_meta['label']} Promo ({aspect_ratio}{vo_tag}{char_tag})",
             platform="video_reel" if aspect_ratio == "9:16" else "video_cinema",
             aspect_ratio=aspect_ratio,
             prompt_used=(
@@ -2092,6 +2099,9 @@ class CampaignCoordinator:
         enable_voiceover: bool = True,
         voice: str = "auto",
         voiceover_script: str | None = None,
+        enable_character: bool = True,
+        character_avatar: str = "maya",
+        character_position: str = "pip_bottom_right",
     ) -> VisualAsset:
         """Render a fresh on-demand MP4 cut for an existing campaign and persist it."""
         campaign = await self.store.get_campaign(campaign_id)
@@ -2105,6 +2115,7 @@ class CampaignCoordinator:
         )
 
         vo_desc = f"with AI Voiceover ({voice}) and " if enable_voiceover and voice != "none" else "with "
+        char_desc = f"with Host {character_avatar.capitalize()} " if enable_character else ""
         await self.band.post_room_message(
             campaign_id=campaign_id,
             room_id=campaign.room_id,
@@ -2112,13 +2123,15 @@ class CampaignCoordinator:
             event_type=EventType.AGENT_THINKING,
             message=(
                 f"Rendering custom {aspect_ratio} MP4 cut using `{shot_style}` shot recipe "
-                f"{vo_desc}measured easing curves & beat-synced soundtrack..."
+                f"{vo_desc}{char_desc}& YouTube-styled advertising chrome..."
             ),
             payload={
                 "aspect_ratio": aspect_ratio,
                 "shot_style": shot_style,
                 "enable_voiceover": enable_voiceover,
                 "voice": voice,
+                "enable_character": enable_character,
+                "character_avatar": character_avatar,
             },
             trigger_mentions=False,
         )
@@ -2131,6 +2144,9 @@ class CampaignCoordinator:
             enable_voiceover=enable_voiceover,
             voice=voice,
             voiceover_script=voiceover_script,
+            enable_character=enable_character,
+            character_avatar=character_avatar,
+            character_position=character_position,
         )
 
         # Persist the newly rendered video onto the campaign's visual_output

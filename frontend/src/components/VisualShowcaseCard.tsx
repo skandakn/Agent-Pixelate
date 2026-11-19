@@ -66,6 +66,7 @@ export function VisualShowcaseCard({
   brief,
   creatives,
   videos,
+  palette = [],
   artDirectionSummary,
   storyboard,
   isLoading,
@@ -840,8 +841,10 @@ export function VisualShowcaseCard({
             <VideoStudioPlayer
               campaignId={campaignId}
               brief={brief}
-              palette={[]}
+              palette={palette}
               videos={videos}
+              creatives={creatives}
+              storyboard={storyboard}
               isLiveBackend={isLiveBackend}
               isRenderingCut={isRenderingCut}
               renderError={renderError}

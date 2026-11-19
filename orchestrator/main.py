@@ -68,6 +68,9 @@ class VideoRenderRequest(BaseModel):
     enable_voiceover: bool = True
     voice: str = "auto"
     voiceover_script: str | None = None
+    enable_character: bool = True
+    character_avatar: str = "maya"
+    character_position: str = "pip_bottom_right"
 
 logger = logging.getLogger("agent_pixelate.orchestrator")
 
@@ -498,6 +501,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 enable_voiceover=body.enable_voiceover,
                 voice=body.voice,
                 voiceover_script=body.voiceover_script,
+                enable_character=body.enable_character,
+                character_avatar=body.character_avatar,
+                character_position=body.character_position,
             )
         except KeyError as exc:
             raise HTTPException(

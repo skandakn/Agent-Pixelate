@@ -15,6 +15,18 @@ export type VideoShotStyle =
 
 export type VideoAspectRatio = "16:9" | "9:16";
 
+export type CharacterAvatarId = "maya" | "leo" | "aria" | "pixel";
+export type CharacterPosition = "pip_bottom_right" | "pip_bottom_left" | "split_host" | "floating_badge";
+
+export interface CharacterAvatarConfig {
+  id: CharacterAvatarId;
+  name: string;
+  role: string;
+  tagline: string;
+  themeColor: string;
+  accentBadge: string;
+}
+
 export interface CampaignVideoAsset {
   id: string;
   title: string;
@@ -26,6 +38,9 @@ export interface CampaignVideoAsset {
   hasVoiceover?: boolean;
   voiceName?: string;
   voiceoverScript?: string;
+  enableCharacter?: boolean;
+  characterAvatar?: CharacterAvatarId;
+  characterPosition?: CharacterPosition;
 }
 
 export type PipelineStage =
