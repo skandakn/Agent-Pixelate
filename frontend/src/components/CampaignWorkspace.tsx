@@ -182,7 +182,15 @@ export function CampaignWorkspace() {
   }, [finalAssets, extraVideos]);
 
   const handleRenderCustomCut = useCallback(
-    async (aspectRatio: VideoAspectRatio, shotStyle: VideoShotStyle) => {
+    async (
+      aspectRatio: VideoAspectRatio,
+      shotStyle: VideoShotStyle,
+      voiceoverOptions?: {
+        enableVoiceover?: boolean;
+        voice?: string;
+        voiceoverScript?: string;
+      }
+    ) => {
       if (!campaignId) return;
       setIsRenderingCut(true);
       setVideoRenderError(null);
@@ -190,7 +198,8 @@ export function CampaignWorkspace() {
         const newVideo = await requestCustomVideoCut(
           campaignId,
           aspectRatio,
-          shotStyle
+          shotStyle,
+          voiceoverOptions
         );
         setExtraVideos((prev) => [...prev, newVideo]);
       } catch (err) {

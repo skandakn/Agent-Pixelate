@@ -99,6 +99,9 @@ class VideoRenderSpec:
     duration_sec: float = 8.0
     fps: int = 24
     hero_image_paths: list[str] = field(default_factory=list)
+    enable_voiceover: bool = True
+    voice: str = "auto"
+    voiceover_script: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -181,6 +184,79 @@ def build_directors_shot_list(spec: VideoRenderSpec) -> list[dict[str, str]]:
             "name": "Conversion Monolith Lockup",
             "camera": "Center settle + beat-synced pulsing CTA button",
             "copy": f"{spec.brand_name} — {spec.cta_label}",
+        },
+    ]
+
+
+def build_voiceover_script(spec: VideoRenderSpec) -> str:
+    """Build a natural, timed 4-beat voiceover narration script for the campaign film."""
+    if spec.voiceover_script and spec.voiceover_script.strip():
+        return spec.voiceover_script.strip()
+
+    brand = spec.brand_name.strip()
+    hook = spec.hook.strip().rstrip(".!?")
+
+    words = spec.description.strip().split()
+    short_desc = " ".join(words[:14]).rstrip(".!?,")
+
+    aud = spec.target_audience.strip().rstrip(".!?")
+    if len(aud) > 48:
+        aud = " ".join(aud.split()[:6])
+
+    tagline = spec.tagline.strip().rstrip(".!?")
+    if len(tagline) > 52:
+        tagline = " ".join(tagline.split()[:7])
+
+    cta = spec.cta_label.strip().rstrip(".!?")
+
+    b1 = f"Introducing {brand}. {hook}."
+    b2 = f"{short_desc}."
+    b3 = f"Built for {aud}."
+    b4 = f"{tagline}. {cta} today."
+
+    return f"{b1} {b2} {b3} {b4}"
+
+
+def build_voiceover_beats(spec: VideoRenderSpec) -> list[dict[str, str]]:
+    """Return timed narration cues for subtitles and UI display."""
+    script = build_voiceover_script(spec)
+    b1 = round(spec.duration_sec * 0.25, 1)
+    b2 = round(spec.duration_sec * 0.53, 1)
+    b3 = round(spec.duration_sec * 0.78, 1)
+    end = round(spec.duration_sec, 1)
+
+    sentences = [
+        s.strip()
+        for s in script.replace("! ", ". ").replace("? ", ". ").split(". ")
+        if s.strip()
+    ]
+    while len(sentences) < 4:
+        sentences.append(f"{spec.brand_name}. {spec.cta_label}.")
+
+    return [
+        {
+            "beat": "01",
+            "window": f"0.0s–{b1}s",
+            "label": "Hook Voiceover",
+            "text": sentences[0] + ("." if not sentences[0].endswith(".") else ""),
+        },
+        {
+            "beat": "02",
+            "window": f"{b1}s–{b2}s",
+            "label": "Product Voiceover",
+            "text": sentences[1] + ("." if not sentences[1].endswith(".") else ""),
+        },
+        {
+            "beat": "03",
+            "window": f"{b2}s–{b3}s",
+            "label": "Audience Voiceover",
+            "text": sentences[2] + ("." if not sentences[2].endswith(".") else ""),
+        },
+        {
+            "beat": "04",
+            "window": f"{b3}s–{end}s",
+            "label": "Call-To-Action Voiceover",
+            "text": sentences[3] + ("." if not sentences[3].endswith(".") else ""),
         },
     ]
 
@@ -445,6 +521,179 @@ def _synthesize_soundtrack_wav(
         wf.writeframes(bytes(frames))
 
 
+def _synthesize_formant_wav(
+    output_path: Path, script: str, duration_sec: float = 8.0, sample_rate: int = 22050
+) -> None:
+    """Zero-dependency vocal resonance fallback synthesizer for headless/CI environments."""
+    total_samples = int(duration_sec * sample_rate)
+    frames = bytearray(total_samples * 4)  # 16-bit stereo PCM
+    words = [w for w in script.split() if w]
+    num_words = max(1, len(words))
+    word_len = duration_sec / (num_words * 1.3)
+
+    two_pi = 2.0 * math.pi
+    inv_sr = 1.0 / sample_rate
+
+    for i in range(total_samples):
+        t = i * inv_sr
+        local_w_t = t % (duration_sec / num_words)
+
+        env = 0.0
+        if local_w_t < word_len:
+            attack = min(1.0, local_w_t / 0.04)
+            decay = max(0.0, 1.0 - (local_w_t / word_len))
+            env = attack * decay * 0.45
+
+        f0 = 135.0 + 15.0 * math.sin(t * 3.0)
+        vocal = (
+            math.sin(two_pi * f0 * t) * 0.45
+            + math.sin(two_pi * (f0 * 3.7) * t) * 0.25
+            + math.sin(two_pi * (f0 * 7.2) * t) * 0.15
+        )
+        sample = int(max(-0.95, min(0.95, vocal * env)) * 32767)
+        struct.pack_into("<hh", frames, i * 4, sample, sample)
+
+    with wave.open(str(output_path), "wb") as wf:
+        wf.setnchannels(2)
+        wf.setsampwidth(2)
+        wf.setframerate(sample_rate)
+        wf.writeframes(bytes(frames))
+
+
+def _synthesize_voiceover_wav(
+    script: str,
+    output_wav_path: Path,
+    voice: str = "auto",
+    brand_tone: str = "Bold",
+    duration_sec: float = 8.0,
+) -> bool:
+    """Synthesize speech into `output_wav_path` using Windows SAPI, macOS say, Linux espeak, or formant fallback."""
+    clean_script = script.strip()
+    if not clean_script:
+        return False
+
+    output_wav_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # 1. Windows SAPI (Microsoft Zira / Microsoft David) via PowerShell
+    if os.name == "nt" and shutil.which("powershell"):
+        try:
+            target = (
+                "David"
+                if "david" in voice.lower()
+                or "male" in voice.lower()
+                or (
+                    voice == "auto"
+                    and any(
+                        k in brand_tone.lower()
+                        for k in ("bold", "tech", "pulse", "athletic")
+                    )
+                )
+                else "Zira"
+            )
+
+            with tempfile.TemporaryDirectory(prefix="pixelate_tts_") as tmpdir:
+                ps1_path = Path(tmpdir) / "synth.ps1"
+                escaped_text = clean_script.replace("'", "''")
+                out_escaped = str(output_wav_path).replace("'", "''")
+                ps_script = f"""
+Add-Type -AssemblyName System.Speech
+$syn = New-Object System.Speech.Synthesis.SpeechSynthesizer
+$found = $null
+foreach ($v in $syn.GetInstalledVoices()) {{
+    if ($v.VoiceInfo.Name -match '{target}') {{
+        $found = $v.VoiceInfo.Name
+        break
+    }}
+}}
+if ($found) {{
+    $syn.SelectVoice($found)
+}}
+$syn.Rate = 0
+$syn.Volume = 100
+$syn.SetOutputToWaveFile('{out_escaped}')
+$syn.Speak('{escaped_text}')
+$syn.Dispose()
+"""
+                ps1_path.write_text(ps_script, encoding="utf-8")
+                proc = subprocess.run(
+                    [
+                        "powershell",
+                        "-NoProfile",
+                        "-ExecutionPolicy",
+                        "Bypass",
+                        "-File",
+                        str(ps1_path),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=20,
+                )
+                if (
+                    proc.returncode == 0
+                    and output_wav_path.exists()
+                    and output_wav_path.stat().st_size > 1000
+                ):
+                    logger.info(
+                        "Synthesized voiceover via Windows SAPI (%s): %s",
+                        target,
+                        output_wav_path.name,
+                    )
+                    return True
+        except Exception as exc:
+            logger.warning("Windows SAPI voiceover synthesis fallback: %s", exc)
+
+    # 2. Linux espeak-ng / espeak fallback
+    for espeak_bin in ("espeak-ng", "espeak"):
+        if shutil.which(espeak_bin):
+            try:
+                proc = subprocess.run(
+                    [espeak_bin, "-w", str(output_wav_path), clean_script],
+                    capture_output=True,
+                    timeout=15,
+                )
+                if (
+                    proc.returncode == 0
+                    and output_wav_path.exists()
+                    and output_wav_path.stat().st_size > 1000
+                ):
+                    logger.info("Synthesized voiceover via %s", espeak_bin)
+                    return True
+            except Exception as exc:
+                logger.warning("%s voiceover synthesis error: %s", espeak_bin, exc)
+
+    # 3. macOS say fallback
+    if shutil.which("say") and shutil.which("ffmpeg"):
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".aiff", delete=False) as aiff_file:
+                aiff_path = Path(aiff_file.name)
+            proc = subprocess.run(
+                ["say", "-o", str(aiff_path), clean_script],
+                capture_output=True,
+                timeout=15,
+            )
+            if proc.returncode == 0 and aiff_path.exists():
+                subprocess.run(
+                    ["ffmpeg", "-y", "-i", str(aiff_path), str(output_wav_path)],
+                    capture_output=True,
+                    timeout=10,
+                )
+                aiff_path.unlink(missing_ok=True)
+                if output_wav_path.exists() and output_wav_path.stat().st_size > 1000:
+                    logger.info("Synthesized voiceover via macOS say")
+                    return True
+        except Exception as exc:
+            logger.warning("macOS say voiceover synthesis error: %s", exc)
+
+    # 4. Zero-dependency harmonic vocalizer fallback
+    try:
+        _synthesize_formant_wav(output_wav_path, clean_script, duration_sec=duration_sec)
+        logger.info("Synthesized voiceover via harmonic vocalizer fallback")
+        return True
+    except Exception as exc:
+        logger.error("Failed all voiceover synthesis engines: %s", exc)
+        return False
+
+
 # ---------------------------------------------------------------------------
 # Precomputed Studio Assets: Glow Sprites, Film Grain, Vignette, Hero Cards
 # ---------------------------------------------------------------------------
@@ -675,6 +924,33 @@ def _render_frame(
         font=fonts["mono_sm"],
         fill=(*text_rgb, 235),
     )
+
+    # Top live Voiceover Telemetry Pill
+    if spec.enable_voiceover and spec.voice != "none":
+        vo_target = (
+            "DAVID"
+            if "david" in (spec.voice or "").lower()
+            or "male" in (spec.voice or "").lower()
+            or (
+                spec.voice == "auto"
+                and any(
+                    k in spec.brand_tone.lower()
+                    for k in ("bold", "tech", "athletic")
+                )
+            )
+            else "ZIRA"
+        )
+        vo_txt = f"VO // {vo_target}"
+        b_box = overlay.textbbox((0, 0), spec.brand_name.upper()[:28], font=fonts["mono_sm"])
+        vo_x = pad + 32 + (b_box[2] - b_box[0]) + 16
+        if vo_x < width - pad - 210:
+            overlay.text((vo_x, pad + 16), vo_txt, font=fonts["mono_xs"], fill=(*primary_rgb, 220))
+            for eq_i in range(3):
+                eq_h = 2 + int(6 * abs(math.sin(t * 7.5 + eq_i * 1.3)))
+                overlay.rectangle(
+                    (vo_x + 64 + eq_i * 4, pad + 25 - eq_h, vo_x + 64 + eq_i * 4 + 2, pad + 25),
+                    fill=(*accent_rgb, 230),
+                )
 
     # Top-right shot style + live 24fps timecode
     style_label = SHOT_STYLES.get(spec.shot_style, {}).get("label", spec.shot_style).upper()
@@ -1065,42 +1341,100 @@ def render_campaign_video_mp4(spec: VideoRenderSpec, output_path: Path) -> Path:
         wav_path = Path(tmpdir) / "soundtrack.wav"
         _synthesize_soundtrack_wav(wav_path, spec.duration_sec, spec.shot_style)
 
-        cmd = [
-            ffmpeg_bin,
-            "-y",
-            "-loglevel",
-            "error",
-            "-f",
-            "rawvideo",
-            "-vcodec",
-            "rawvideo",
-            "-pix_fmt",
-            "rgb24",
-            "-s",
-            f"{width}x{height}",
-            "-r",
-            str(spec.fps),
-            "-i",
-            "-",
-            "-i",
-            str(wav_path),
-            "-c:v",
-            "libx264",
-            "-preset",
-            "veryfast",
-            "-crf",
-            "21",
-            "-pix_fmt",
-            "yuv420p",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "160k",
-            "-movflags",
-            "+faststart",
-            "-shortest",
-            str(output_path),
-        ]
+        has_voiceover = False
+        vo_wav_path = Path(tmpdir) / "voiceover.wav"
+        if spec.enable_voiceover and spec.voice != "none":
+            script = build_voiceover_script(spec)
+            has_voiceover = _synthesize_voiceover_wav(
+                script=script,
+                output_wav_path=vo_wav_path,
+                voice=spec.voice,
+                brand_tone=spec.brand_tone,
+                duration_sec=spec.duration_sec,
+            )
+
+        if has_voiceover and vo_wav_path.exists() and vo_wav_path.stat().st_size > 1000:
+            cmd = [
+                ffmpeg_bin,
+                "-y",
+                "-loglevel",
+                "error",
+                "-f",
+                "rawvideo",
+                "-vcodec",
+                "rawvideo",
+                "-pix_fmt",
+                "rgb24",
+                "-s",
+                f"{width}x{height}",
+                "-r",
+                str(spec.fps),
+                "-i",
+                "-",
+                "-i",
+                str(wav_path),
+                "-i",
+                str(vo_wav_path),
+                "-filter_complex",
+                "[1:a]volume=0.30[bg];[2:a]volume=1.15[vo];[bg][vo]amix=inputs=2:duration=first:dropout_transition=2[a]",
+                "-map",
+                "0:v",
+                "-map",
+                "[a]",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-crf",
+                "21",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "192k",
+                "-movflags",
+                "+faststart",
+                "-shortest",
+                str(output_path),
+            ]
+        else:
+            cmd = [
+                ffmpeg_bin,
+                "-y",
+                "-loglevel",
+                "error",
+                "-f",
+                "rawvideo",
+                "-vcodec",
+                "rawvideo",
+                "-pix_fmt",
+                "rgb24",
+                "-s",
+                f"{width}x{height}",
+                "-r",
+                str(spec.fps),
+                "-i",
+                "-",
+                "-i",
+                str(wav_path),
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-crf",
+                "21",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "160k",
+                "-movflags",
+                "+faststart",
+                "-shortest",
+                str(output_path),
+            ]
 
         proc = subprocess.Popen(
             cmd,

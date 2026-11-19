@@ -43,7 +43,12 @@ interface VisualShowcaseCardProps {
   renderError: string | null;
   onRenderCustomCut: (
     aspectRatio: VideoAspectRatio,
-    shotStyle: VideoShotStyle
+    shotStyle: VideoShotStyle,
+    voiceoverOptions?: {
+      enableVoiceover?: boolean;
+      voice?: string;
+      voiceoverScript?: string;
+    }
   ) => void;
 }
 

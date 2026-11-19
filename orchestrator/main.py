@@ -63,6 +63,9 @@ class VideoRenderRequest(BaseModel):
 
     aspect_ratio: AspectRatio = "16:9"
     shot_style: ShotStyle = "obsidian_cinema"
+    enable_voiceover: bool = True
+    voice: str = "auto"
+    voiceover_script: str | None = None
 
 logger = logging.getLogger("agent_pixelate.orchestrator")
 
@@ -480,6 +483,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 campaign_id,
                 aspect_ratio=body.aspect_ratio,
                 shot_style=body.shot_style,
+                enable_voiceover=body.enable_voiceover,
+                voice=body.voice,
+                voiceover_script=body.voiceover_script,
             )
         except KeyError as exc:
             raise HTTPException(

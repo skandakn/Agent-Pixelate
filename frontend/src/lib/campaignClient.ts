@@ -274,6 +274,10 @@ function adaptBackendCampaignToAssets(
             : idLower.includes("pulse")
               ? "pulse_drop"
               : "obsidian_cinema";
+    const prompt = asset.prompt_used || "";
+    const hasVo = prompt.includes("VO:") || asset.title.includes("VO:");
+    const voMatch = prompt.match(/VO:\s*([A-Za-z0-9_-]+)/i) || asset.title.match(/VO:\s*([A-Za-z0-9_-]+)/i);
+    const voiceName = voMatch ? voMatch[1] : undefined;
     return {
       id: asset.asset_id || `${backend.campaign_id}-vid-${idx + 1}`,
       title: asset.title,
@@ -282,6 +286,8 @@ function adaptBackendCampaignToAssets(
       shotStyle: style,
       durationSec: 10,
       promptSummary: asset.prompt_used || "Cinematic H.264 promo render",
+      hasVoiceover: hasVo,
+      voiceName,
     };
   });
 
@@ -1631,10 +1637,17 @@ export async function approveBandHandoff(
   return res.ok;
 }
 
+export interface VideoCutOptions {
+  enableVoiceover?: boolean;
+  voice?: string;
+  voiceoverScript?: string;
+}
+
 export async function requestCustomVideoCut(
   campaignId: string,
   aspectRatio: VideoAspectRatio,
-  shotStyle: VideoShotStyle
+  shotStyle: VideoShotStyle,
+  options?: VideoCutOptions
 ): Promise<CampaignVideoAsset> {
   const { apiBase } = resolveBackendEndpoints();
   const res = await fetch(`${apiBase}/api/campaigns/${campaignId}/video`, {
@@ -1643,6 +1656,9 @@ export async function requestCustomVideoCut(
     body: JSON.stringify({
       aspect_ratio: aspectRatio,
       shot_style: shotStyle,
+      enable_voiceover: options?.enableVoiceover ?? true,
+      voice: options?.voice ?? "auto",
+      voiceover_script: options?.voiceoverScript ?? null,
     }),
   });
 
@@ -1656,6 +1672,11 @@ export async function requestCustomVideoCut(
     ? asset.asset_url
     : `${apiBase}${asset.asset_url.startsWith("/") ? "" : "/"}${asset.asset_url}`;
 
+  const prompt = asset.prompt_used || "";
+  const hasVo = prompt.includes("VO:") || Boolean(options?.enableVoiceover);
+  const voMatch = prompt.match(/VO:\s*([A-Za-z0-9_-]+)/i) || asset.title.match(/VO:\s*([A-Za-z0-9_-]+)/i);
+  const voiceName = options?.voice || (voMatch ? voMatch[1] : "Studio");
+
   return {
     id: asset.asset_id,
     title: asset.title,
@@ -1664,5 +1685,8 @@ export async function requestCustomVideoCut(
     shotStyle,
     durationSec: 10,
     promptSummary: asset.prompt_used || "Cinematic H.264 MP4 render",
+    hasVoiceover: hasVo,
+    voiceName,
+    voiceoverScript: options?.voiceoverScript,
   };
 }

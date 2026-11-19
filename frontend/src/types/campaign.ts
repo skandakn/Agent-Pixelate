@@ -20,6 +20,9 @@ export interface CampaignVideoAsset {
   shotStyle: VideoShotStyle;
   durationSec: number;
   promptSummary: string;
+  hasVoiceover?: boolean;
+  voiceName?: string;
+  voiceoverScript?: string;
 }
 
 export type PipelineStage =

@@ -1,16 +1,21 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Download,
+  FileText,
   Film,
   Loader2,
+  Mic,
   Monitor,
   Pause,
   Play,
   Radio,
+  RotateCcw,
   Smartphone,
   Sparkles,
+  Square,
+  Volume2,
   Wand2,
 } from "lucide-react";
 import {
@@ -73,6 +78,32 @@ const DIRECTOR_BEATS = [
   { beat: "04", window: "6.2–8.0s", label: "CTA Lockup", move: "Beat-synced pulse" },
 ];
 
+const VOICEOVER_PRESETS: {
+  id: "auto" | "zira" | "david";
+  label: string;
+  tag: string;
+  desc: string;
+}[] = [
+  {
+    id: "auto",
+    label: "Adaptive Auto",
+    tag: "Tone Matched",
+    desc: "Auto-selects female/male vocal timbre tailored to brand tone",
+  },
+  {
+    id: "zira",
+    label: "Aria / Zira",
+    tag: "Warm Studio",
+    desc: "Nuanced, editorial, conversational female studio voice",
+  },
+  {
+    id: "david",
+    label: "David / Marcus",
+    tag: "Cinematic Executive",
+    desc: "Resonant, authoritative, high-energy male narrator",
+  },
+];
+
 interface VideoStudioPlayerProps {
   campaignId: string | null;
   brief: CampaignBrief;
@@ -83,7 +114,12 @@ interface VideoStudioPlayerProps {
   renderError: string | null;
   onRenderCustomCut: (
     aspectRatio: VideoAspectRatio,
-    shotStyle: VideoShotStyle
+    shotStyle: VideoShotStyle,
+    voiceoverOptions?: {
+      enableVoiceover?: boolean;
+      voice?: string;
+      voiceoverScript?: string;
+    }
   ) => void;
 }
 
@@ -117,6 +153,84 @@ export function VideoStudioPlayer({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [canvasPlaying, setCanvasPlaying] = useState(true);
   const [isRecordingWebm, setIsRecordingWebm] = useState(false);
+
+  // Voiceover & soundstage configuration
+  const [enableVoiceover, setEnableVoiceover] = useState(true);
+  const [selectedVoice, setSelectedVoice] = useState<"auto" | "zira" | "david">("auto");
+  const [showScriptDrawer, setShowScriptDrawer] = useState(false);
+  const [isAuditioning, setIsAuditioning] = useState(false);
+
+  const defaultVoiceoverScript = useMemo(() => {
+    const brand = brief.productName.trim();
+    const firstSentence =
+      brief.productDescription.split(/[.!?]/)[0]?.trim() || `${brand} is here`;
+    const words = brief.productDescription.trim().split(/\s+/);
+    const shortDesc = words.slice(0, 14).join(" ").replace(/[.,!?]+$/, "");
+    const aud = brief.targetAudience.trim().slice(0, 48);
+    const tone = brief.brandTone.toLowerCase();
+    const cta = tone.includes("lux") ? "Discover the collection" : "Shop the drop";
+    return `Introducing ${brand}. ${firstSentence}. ${shortDesc}. Built for ${aud}. Experience ${brand}. ${cta} today.`;
+  }, [brief]);
+
+  const [voiceoverScript, setVoiceoverScript] = useState("");
+  const effectiveScript = voiceoverScript.trim() || defaultVoiceoverScript;
+
+  const handleAuditionVoiceover = useCallback(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (isAuditioning) {
+      window.speechSynthesis.cancel();
+      setIsAuditioning(false);
+      return;
+    }
+
+    const text = effectiveScript;
+    const utter = new SpeechSynthesisUtterance(text);
+    const voices = window.speechSynthesis.getVoices();
+
+    if (
+      selectedVoice === "david" ||
+      (selectedVoice === "auto" &&
+        ["bold", "tech", "pulse", "athletic"].some((k) =>
+          brief.brandTone.toLowerCase().includes(k)
+        ))
+    ) {
+      const male = voices.find(
+        (v) =>
+          v.name.toLowerCase().includes("david") ||
+          v.name.toLowerCase().includes("male") ||
+          v.name.toLowerCase().includes("guy")
+      );
+      if (male) utter.voice = male;
+      utter.pitch = 0.95;
+      utter.rate = 1.05;
+    } else {
+      const female = voices.find(
+        (v) =>
+          v.name.toLowerCase().includes("zira") ||
+          v.name.toLowerCase().includes("female") ||
+          v.name.toLowerCase().includes("aria") ||
+          v.name.toLowerCase().includes("samantha")
+      );
+      if (female) utter.voice = female;
+      utter.pitch = 1.05;
+      utter.rate = 1.0;
+    }
+
+    utter.onend = () => setIsAuditioning(false);
+    utter.onerror = () => setIsAuditioning(false);
+
+    setIsAuditioning(true);
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utter);
+  }, [effectiveScript, isAuditioning, selectedVoice, brief.brandTone]);
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (videos.length > 0) {
@@ -429,6 +543,157 @@ export function VideoStudioPlayer({
           })}
         </div>
 
+        {/* AI Voiceover & Soundstage Console */}
+        <div className="space-y-3 rounded-xl border border-black/[0.06] bg-white p-3.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#0071E3]/10 text-[#0071E3]">
+                <Mic className="h-4 w-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[12px] font-semibold text-[#1D1D1F]">
+                    AI Voiceover &amp; Soundstage
+                  </span>
+                  <span className="rounded bg-[#0071E3]/10 px-1.5 py-0.5 text-[9px] font-medium text-[#0071E3]">
+                    Sidechain Ducking (-12dB)
+                  </span>
+                </div>
+                <p className="text-[10px] text-[#6E6E73]">
+                  24fps synchronized vocal narration mixed over cinematic pads
+                </p>
+              </div>
+            </div>
+
+            {/* Apple iOS-style Toggle Switch */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setEnableVoiceover((v) => !v)}
+                className={cn(
+                  "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                  enableVoiceover ? "bg-[#30D158]" : "bg-black/20"
+                )}
+                role="switch"
+                aria-checked={enableVoiceover}
+              >
+                <span
+                  className={cn(
+                    "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                    enableVoiceover ? "translate-x-5" : "translate-x-0"
+                  )}
+                />
+              </button>
+            </div>
+          </div>
+
+          {enableVoiceover && (
+            <div className="space-y-2.5 pt-1">
+              {/* Voice Preset Selector */}
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
+                {VOICEOVER_PRESETS.map((vp) => {
+                  const active = selectedVoice === vp.id;
+                  return (
+                    <button
+                      key={vp.id}
+                      type="button"
+                      onClick={() => setSelectedVoice(vp.id)}
+                      className={cn(
+                        "rounded-lg border px-2.5 py-1.5 text-left transition",
+                        active
+                          ? "border-[#0071E3] bg-[#0071E3]/[0.04] text-[#1D1D1F]"
+                          : "border-black/[0.06] bg-[#F5F5F7]/60 text-[#6E6E73] hover:bg-[#F5F5F7] hover:text-[#1D1D1F]"
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-semibold">{vp.label}</span>
+                        <span className="font-mono text-[9px] text-[#86868B]">{vp.tag}</span>
+                      </div>
+                      <p className="mt-0.5 line-clamp-1 text-[9px] text-[#86868B]">{vp.desc}</p>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Audition & Script Edit Actions */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/[0.05] pt-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleAuditionVoiceover}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium transition",
+                      isAuditioning
+                        ? "bg-[#D70015] text-white"
+                        : "bg-[#0071E3]/10 text-[#0071E3] hover:bg-[#0071E3]/15"
+                    )}
+                  >
+                    {isAuditioning ? (
+                      <>
+                        <Square className="h-3 w-3 fill-current" />
+                        <span>Stop Audition</span>
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 className="h-3 w-3" />
+                        <span>Audition Voiceover</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowScriptDrawer((s) => !s)}
+                    className="inline-flex items-center gap-1 rounded-full border border-black/[0.08] bg-white px-2.5 py-1 text-[11px] font-medium text-[#1D1D1F] transition hover:bg-[#F5F5F7]"
+                  >
+                    <FileText className="h-3 w-3 text-[#6E6E73]" />
+                    <span>{showScriptDrawer ? "Hide Script" : "Edit Narration"}</span>
+                  </button>
+                </div>
+
+                <span className="font-mono text-[10px] text-[#86868B]">
+                  4-Beat Directors&apos; Cadence
+                </span>
+              </div>
+
+              {/* Script Drawer */}
+              {showScriptDrawer && (
+                <div className="space-y-2 rounded-lg bg-[#F5F5F7] p-2.5 text-[11px]">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-[#1D1D1F]">
+                      Voiceover Narration Script
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setVoiceoverScript("")}
+                      className="inline-flex items-center gap-1 text-[10px] font-medium text-[#0071E3] hover:underline"
+                    >
+                      <RotateCcw className="h-2.5 w-2.5" />
+                      <span>Reset to AI default</span>
+                    </button>
+                  </div>
+                  <textarea
+                    rows={3}
+                    value={voiceoverScript || defaultVoiceoverScript}
+                    onChange={(e) => setVoiceoverScript(e.target.value)}
+                    className="w-full rounded-md border border-black/[0.08] bg-white p-2 text-[11px] text-[#1D1D1F] focus:border-[#0071E3] focus:outline-none"
+                    placeholder="Enter narration script..."
+                  />
+                  <div className="flex flex-wrap gap-1 font-mono text-[9px] text-[#86868B]">
+                    <span className="rounded bg-black/[0.04] px-1 py-0.5">Beat 1: Hook</span>
+                    <span>→</span>
+                    <span className="rounded bg-black/[0.04] px-1 py-0.5">Beat 2: Product</span>
+                    <span>→</span>
+                    <span className="rounded bg-black/[0.04] px-1 py-0.5">Beat 3: Audience</span>
+                    <span>→</span>
+                    <span className="rounded bg-black/[0.04] px-1 py-0.5">Beat 4: CTA</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Render / Export Action Row */}
         <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
           <span className="text-[11px] text-[#6E6E73]">
@@ -441,7 +706,13 @@ export function VideoStudioPlayer({
             <button
               type="button"
               disabled={isRenderingCut}
-              onClick={() => onRenderCustomCut(aspectRatio, shotStyle)}
+              onClick={() =>
+                onRenderCustomCut(aspectRatio, shotStyle, {
+                  enableVoiceover,
+                  voice: selectedVoice,
+                  voiceoverScript: effectiveScript,
+                })
+              }
               className="inline-flex items-center gap-1.5 rounded-full bg-[#0071E3] px-4 py-1.5 text-[12px] font-medium text-white transition hover:bg-[#0077ED] disabled:opacity-50"
             >
               {isRenderingCut ? (
@@ -452,7 +723,9 @@ export function VideoStudioPlayer({
               ) : (
                 <>
                   <Sparkles className="h-3.5 w-3.5" />
-                  <span>Render {aspectRatio} MP4</span>
+                  <span>
+                    Render {aspectRatio} MP4{enableVoiceover ? " + VO" : ""}
+                  </span>
                 </>
               )}
             </button>
@@ -545,6 +818,12 @@ export function VideoStudioPlayer({
                   <span>
                     Cut 0{idx + 1} · {vid.aspectRatio}
                   </span>
+                  {(vid.hasVoiceover || vid.title.includes("VO:") || vid.promptSummary?.includes("VO:")) && (
+                    <span className="inline-flex items-center gap-0.5 rounded-full bg-[#0071E3]/15 px-1.5 py-0.5 font-mono text-[9px] text-[#0071E3]">
+                      <Mic className="h-2.5 w-2.5" />
+                      <span>VO</span>
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
