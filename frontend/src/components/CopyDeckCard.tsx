@@ -1,14 +1,10 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { motion } from "framer-motion";
 import {
   Check,
   Clock,
   Copy,
-  Download,
-  ExternalLink,
-  FileJson,
   Hash,
   Megaphone,
   PenTool,
@@ -47,9 +43,6 @@ export function CopyDeckCard({
   creatives,
   selectedPlatforms,
   isLoading,
-  onExportJson,
-  onExportZip,
-  isExportingZip,
 }: CopyDeckCardProps) {
   const [activeTab, setActiveTab] = useState<CopyTab>("Instagram");
   const [activeMetaIndex, setActiveMetaIndex] = useState(0);
@@ -95,30 +88,30 @@ export function CopyDeckCard({
   const hasContent = socialPosts.length > 0 || metaAds.length > 0;
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-[22px] border border-black/[0.06] bg-white shadow-apple">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] px-6 py-4">
+    <div className="flex flex-col border-2 border-black bg-white shadow-[4px_4px_0px_#000000]">
+      {/* Approva Card Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-black bg-[#E6F7EB] px-5 py-3.5">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F5F5F7] text-[#1D1D1F]">
+          <div className="flex h-8 w-8 items-center justify-center border-2 border-black bg-white shadow-[2px_2px_0px_#000000]">
             <PenTool className="h-4 w-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-[15px] font-semibold tracking-[-0.015em] text-[#1D1D1F]">
-                Copy Deck
+              <h3 className="font-display text-sm font-black uppercase tracking-tight text-black">
+                COPYWRITING DECK &amp; CAMPAIGN TEXT
               </h3>
-              <span className="rounded-full bg-[#F5F5F7] px-2 py-0.5 font-mono text-[10px] font-medium text-[#6E6E73]">
+              <span className="border border-black bg-white px-2 py-0.5 font-mono text-[10px] font-bold text-black">
                 @CopyAgent
               </span>
             </div>
-            <p className="text-[12px] text-[#6E6E73]">
-              Platform-native posts, ad preview &amp; hashtags
+            <p className="font-mono text-xs text-black/70">
+              Platform-native posts, ad hooks &amp; hashtag clusters
             </p>
           </div>
         </div>
 
-        {/* Classic Apple Segmented Tabs */}
-        <div className="flex rounded-full bg-[#F5F5F7] p-1">
+        {/* Brutalist Channel Tabs */}
+        <div className="flex gap-1.5">
           {tabs.map((tab) => {
             const active = activeTab === tab;
             const inBrief = selectedPlatforms.includes(tab);
@@ -128,23 +121,16 @@ export function CopyDeckCard({
                 type="button"
                 onClick={() => setActiveTab(tab)}
                 className={cn(
-                  "relative rounded-full px-3 py-1.5 text-[12px] font-medium transition",
-                  active ? "text-[#1D1D1F]" : "text-[#6E6E73] hover:text-[#1D1D1F]"
+                  "inline-flex items-center gap-1.5 border-2 border-black px-3 py-1 font-mono text-xs font-bold uppercase transition-all",
+                  active
+                    ? "bg-[#10B981] text-black shadow-[2px_2px_0px_#000000]"
+                    : "bg-white text-black hover:bg-gray-100"
                 )}
               >
-                {active && (
-                  <motion.span
-                    layoutId="copyDeckTabBg"
-                    transition={{ type: "spring", stiffness: 400, damping: 32 }}
-                    className="absolute inset-0 rounded-full bg-white shadow-apple-pill"
-                  />
+                <span>{tab}</span>
+                {!inBrief && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-gray-400" />
                 )}
-                <span className="relative z-10 flex items-center gap-1.5">
-                  <span>{tab}</span>
-                  {!inBrief && (
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#D2D2D7]" />
-                  )}
-                </span>
               </button>
             );
           })}
@@ -156,81 +142,83 @@ export function CopyDeckCard({
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-12 text-center">
           {isLoading ? (
             <>
-              <div className="flex h-12 w-12 animate-pulse items-center justify-center rounded-full bg-[#0071E3]/[0.1] text-[#0071E3]">
-                <Sparkles className="h-5 w-5" />
+              <div className="flex h-12 w-12 animate-pulse items-center justify-center border-2 border-black bg-[#FEF3C7] text-black shadow-[3px_3px_0px_#000000]">
+                <Sparkles className="h-6 w-6" />
               </div>
-              <p className="text-[15px] font-semibold tracking-[-0.01em] text-[#1D1D1F]">
-                Drafting synchronized platform copy…
+              <p className="font-display text-base font-black uppercase text-black">
+                Generating Synchronized Conversion Copy...
               </p>
-              <p className="text-[13px] text-[#6E6E73]">
-                @CopyAgent is aligning tone and hooks to the visual brief.
+              <p className="font-mono text-xs text-black/70">
+                @CopyAgent is reading visual mood and crafting channel-native messaging.
               </p>
             </>
           ) : (
-            <p className="text-[14px] text-[#86868B]">
-              Instagram, LinkedIn, and Meta Ads copy will appear here.
-            </p>
+            <div className="border-2 border-dashed border-black/40 bg-[#E6F7EB]/30 p-8">
+              <p className="font-mono text-xs font-bold text-black/60">
+                [NO COPY GENERATED] Run campaign brief to hydrate social &amp; ad variants.
+              </p>
+            </div>
           )}
         </div>
       ) : (
-        <div className="flex flex-1 flex-col justify-between gap-5 p-6">
+        <div className="flex flex-1 flex-col justify-between gap-4 p-5">
           <div className="space-y-4">
             {/* Instagram & LinkedIn Posts */}
             {activeTab !== "Meta Ads" && (
-              <div className="space-y-3.5">
+              <div className="space-y-3">
                 {filteredPosts.map((post) => {
                   const fullPostText = `${post.hook}\n\n${post.body}\n\n${post.callToAction}\n\n${hashtags.join(" ")}`;
                   const isCopied = copiedId === post.id;
                   return (
                     <div
                       key={post.id}
-                      className="rounded-2xl border border-black/[0.06] bg-[#F5F5F7] p-4 transition hover:border-black/[0.12]"
+                      className="border-2 border-black bg-white p-3.5 shadow-[2px_2px_0px_#000000]"
                     >
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/[0.06] pb-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-black pb-2">
                         <div className="flex items-center gap-2">
-                          <span className="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-semibold text-[#1D1D1F] shadow-sm">
+                          <span className="border border-black bg-[#E6F7EB] px-2 py-0.5 font-mono text-[10px] font-black uppercase text-black">
                             {post.variantLabel}
                           </span>
-                          <span className="inline-flex items-center gap-1 text-[11px] text-[#6E6E73]">
-                            <Clock className="h-3 w-3 text-[#86868B]" />
+                          <span className="inline-flex items-center gap-1 font-mono text-[10px] text-black/70">
+                            <Clock className="h-3 w-3" />
                             {post.bestTimeToPost}
                           </span>
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-[#248A3D]/10 px-2.5 py-0.5 text-[11px] font-medium text-[#1D6F31]">
+                          <span className="inline-flex items-center gap-1 border border-black bg-[#D1FAE5] px-2 py-0.5 font-mono text-[10px] font-bold text-black">
                             <TrendingUp className="h-3 w-3" />
                             {post.estimatedEngagement}
                           </span>
                           <button
                             type="button"
                             onClick={() => handleCopy(post.id, fullPostText)}
-                            className="inline-flex items-center gap-1 rounded-full border border-black/[0.08] bg-white px-2.5 py-1 text-[11px] font-medium text-[#1D1D1F] transition hover:border-black/[0.2]"
+                            className="inline-flex items-center gap-1 border-2 border-black bg-white px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-black shadow-[1px_1px_0px_#000000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
                           >
                             {isCopied ? (
                               <>
-                                <Check className="h-3 w-3 text-[#248A3D]" />
-                                <span className="text-[#1D6F31]">Copied</span>
+                                <Check className="h-3 w-3 text-[#10B981]" />
+                                <span>COPIED</span>
                               </>
                             ) : (
                               <>
-                                <Copy className="h-3 w-3 text-[#6E6E73]" />
-                                <span>Copy</span>
+                                <Copy className="h-3 w-3" />
+                                <span>COPY</span>
                               </>
                             )}
                           </button>
                         </div>
                       </div>
 
-                      <div className="mt-3 space-y-2.5">
-                        <p className="text-[14px] font-semibold leading-snug tracking-[-0.01em] text-[#1D1D1F]">
+                      <div className="mt-2.5 space-y-2">
+                        <p className="font-display text-sm font-black text-black">
                           {post.hook}
                         </p>
-                        <p className="whitespace-pre-line text-[13px] leading-relaxed text-[#424245]">
+                        <p className="whitespace-pre-line font-mono text-xs leading-relaxed text-black/80">
                           {post.body}
                         </p>
-                        <div className="rounded-xl bg-white px-3.5 py-2.5 text-[12px] text-[#1D1D1F] shadow-sm">
-                          <span className="font-semibold text-[#0066CC]">
+                        <div className="border border-black bg-[#E6F7EB]/50 p-2 font-mono text-xs text-black">
+                          <span className="font-bold uppercase text-black">
                             Call to Action:{" "}
                           </span>
                           {post.callToAction}
@@ -253,24 +241,24 @@ export function CopyDeckCard({
                         type="button"
                         onClick={() => setActiveMetaIndex(idx)}
                         className={cn(
-                          "rounded-full border px-3.5 py-1.5 text-[12px] font-medium transition",
+                          "border-2 border-black px-3 py-1 font-mono text-xs font-bold uppercase transition-all",
                           idx === activeMetaIndex
-                            ? "border-[#1D1D1F] bg-[#1D1D1F] text-white"
-                            : "border-black/[0.08] bg-[#F5F5F7] text-[#6E6E73] hover:text-[#1D1D1F]"
+                            ? "bg-black text-white shadow-[2px_2px_0px_#000000]"
+                            : "bg-white text-black hover:bg-gray-100"
                         )}
                       >
-                        Variant 0{idx + 1}: {variant.angle}
+                        VARIANT 0{idx + 1}: {variant.angle}
                       </button>
                     ))}
                   </div>
                 )}
 
-                {/* Copy Spec */}
-                <div className="space-y-3 rounded-2xl bg-[#F5F5F7] p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[#1D1D1F]">
-                      <Megaphone className="h-3.5 w-3.5 text-[#0071E3]" />
-                      Ad Copy Specification
+                {/* Copy Spec Box */}
+                <div className="space-y-2.5 border-2 border-black bg-[#E6F7EB]/40 p-3.5 shadow-[2px_2px_0px_#000000]">
+                  <div className="flex items-center justify-between border-b border-black pb-1.5">
+                    <span className="flex items-center gap-1.5 font-display text-xs font-black uppercase text-black">
+                      <Megaphone className="h-3.5 w-3.5" />
+                      AD COPY SPECIFICATION
                     </span>
                     <button
                       type="button"
@@ -280,45 +268,39 @@ export function CopyDeckCard({
                           `Headline: ${activeMetaAd.headline}\nPrimary Text: ${activeMetaAd.primaryText}\nDescription: ${activeMetaAd.description}\nCTA: ${activeMetaAd.ctaLabel}`
                         )
                       }
-                      className="inline-flex items-center gap-1 rounded-full border border-black/[0.08] bg-white px-2.5 py-1 text-[11px] font-medium text-[#1D1D1F] transition hover:border-black/[0.2]"
+                      className="inline-flex items-center gap-1 border-2 border-black bg-white px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-black shadow-[1px_1px_0px_#000000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
                     >
                       {copiedId === activeMetaAd.id ? (
                         <>
-                          <Check className="h-3 w-3 text-[#248A3D]" />
-                          <span className="text-[#1D6F31]">Copied</span>
+                          <Check className="h-3 w-3 text-[#10B981]" />
+                          <span>COPIED</span>
                         </>
                       ) : (
                         <>
-                          <Copy className="h-3 w-3 text-[#6E6E73]" />
-                          <span>Copy Ad</span>
+                          <Copy className="h-3 w-3" />
+                          <span>COPY AD</span>
                         </>
                       )}
                     </button>
                   </div>
 
-                  <div className="space-y-2.5 text-[13px]">
+                  <div className="space-y-2 font-mono text-xs">
                     <div>
-                      <span className="text-[11px] font-medium text-[#86868B]">
-                        Primary Text
-                      </span>
-                      <p className="mt-0.5 leading-relaxed text-[#1D1D1F]">
+                      <span className="font-bold text-black/60">PRIMARY TEXT:</span>
+                      <p className="mt-0.5 leading-relaxed text-black">
                         {activeMetaAd.primaryText}
                       </p>
                     </div>
-                    <div className="grid grid-cols-1 gap-2.5 pt-1 sm:grid-cols-2">
-                      <div className="rounded-xl bg-white p-3 shadow-sm">
-                        <span className="text-[11px] font-medium text-[#86868B]">
-                          Headline
-                        </span>
-                        <p className="mt-0.5 text-[13px] font-semibold text-[#1D1D1F]">
+                    <div className="grid grid-cols-1 gap-2 pt-1 sm:grid-cols-2">
+                      <div className="border border-black bg-white p-2">
+                        <span className="font-bold text-black/60">HEADLINE:</span>
+                        <p className="mt-0.5 font-display text-xs font-bold text-black">
                           {activeMetaAd.headline}
                         </p>
                       </div>
-                      <div className="rounded-xl bg-white p-3 shadow-sm">
-                        <span className="text-[11px] font-medium text-[#86868B]">
-                          Description
-                        </span>
-                        <p className="mt-0.5 text-[12px] text-[#424245]">
+                      <div className="border border-black bg-white p-2">
+                        <span className="font-bold text-black/60">DESCRIPTION:</span>
+                        <p className="mt-0.5 font-mono text-[11px] text-black/80">
                           {activeMetaAd.description}
                         </p>
                       </div>
@@ -326,33 +308,33 @@ export function CopyDeckCard({
                   </div>
                 </div>
 
-                {/* Light-Mode Meta Ad Feed Preview */}
-                <div className="overflow-hidden rounded-2xl border border-black/[0.08] bg-white shadow-sm">
-                  <div className="flex items-center justify-between px-4 py-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1D1D1F] text-[11px] font-semibold text-white">
+                {/* Brutalist Meta Feed Mockup */}
+                <div className="border-2 border-black bg-white shadow-[2px_2px_0px_#000000]">
+                  <div className="flex items-center justify-between border-b-2 border-black bg-[#E6F7EB]/40 px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-6 w-6 items-center justify-center border border-black bg-black font-mono text-[10px] font-bold text-white">
                         {(assets?.brief.productName || "AP").slice(0, 2).toUpperCase()}
                       </div>
                       <div>
-                        <div className="text-[13px] font-semibold text-[#1D1D1F]">
+                        <div className="font-display text-xs font-bold text-black">
                           {assets?.brief.productName || "Brand Studio"}
                         </div>
-                        <div className="text-[11px] text-[#86868B]">
-                          Sponsored · Meta Feed Preview
+                        <div className="font-mono text-[10px] text-black/60">
+                          Sponsored · Feed Ad Preview
                         </div>
                       </div>
                     </div>
-                    <span className="rounded-full bg-[#F5F5F7] px-2.5 py-0.5 text-[10px] font-medium text-[#6E6E73]">
-                      Ad Preview
+                    <span className="border border-black bg-white px-2 py-0.5 font-mono text-[9px] font-bold uppercase text-black">
+                      MOCKUP
                     </span>
                   </div>
 
-                  <p className="px-4 pb-3 text-[13px] leading-relaxed text-[#424245]">
+                  <p className="p-3 font-mono text-xs leading-relaxed text-black">
                     {activeMetaAd.primaryText}
                   </p>
 
                   {metaPreviewCreative && (
-                    <div className="aspect-[16/9] w-full overflow-hidden border-y border-black/[0.06] bg-[#F5F5F7]">
+                    <div className="aspect-[16/9] w-full overflow-hidden border-y-2 border-black bg-black">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={metaPreviewCreative.imageUrl}
@@ -362,117 +344,71 @@ export function CopyDeckCard({
                     </div>
                   )}
 
-                  <div className="flex flex-wrap items-center justify-between gap-3 bg-[#FBFBFD] px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3 bg-[#E6F7EB]/20 p-3">
                     <div className="min-w-0 flex-1">
-                      <div className="text-[10px] font-medium uppercase tracking-wide text-[#86868B]">
+                      <div className="font-mono text-[10px] uppercase text-black/60">
                         {activeMetaAd.displayUrl}
                       </div>
-                      <div className="truncate text-[14px] font-semibold text-[#1D1D1F]">
+                      <div className="truncate font-display text-sm font-bold text-black">
                         {activeMetaAd.headline}
                       </div>
-                      <div className="truncate text-[12px] text-[#6E6E73]">
+                      <div className="truncate font-mono text-xs text-black/70">
                         {activeMetaAd.description}
                       </div>
                     </div>
 
                     <button
                       type="button"
-                      onClick={() =>
-                        handleCopy(
-                          `cta-${activeMetaAd.id}`,
-                          activeMetaAd.ctaLabel
-                        )
-                      }
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#0071E3] px-4 py-2 text-[12px] font-medium text-white transition hover:bg-[#0077ED]"
+                      onClick={() => handleCopy("meta-cta", activeMetaAd.ctaLabel)}
+                      className="border-2 border-black bg-[#10B981] px-3 py-1 font-mono text-xs font-bold uppercase text-black shadow-[2px_2px_0px_#000000]"
                     >
-                      <span>{activeMetaAd.ctaLabel}</span>
-                      <ExternalLink className="h-3.5 w-3.5" />
+                      {activeMetaAd.ctaLabel}
                     </button>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Curated Hashtags */}
+            {/* Hashtag Stack */}
             {hashtags.length > 0 && (
-              <div className="space-y-2.5 rounded-2xl bg-[#F5F5F7] p-4">
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[#1D1D1F]">
-                    <Hash className="h-3.5 w-3.5 text-[#6E6E73]" />
-                    Hashtags
+              <div className="space-y-1.5 border-2 border-black bg-[#E6F7EB]/30 p-3 shadow-[2px_2px_0px_#000000]">
+                <div className="flex items-center justify-between border-b border-black pb-1">
+                  <span className="flex items-center gap-1 font-display text-xs font-bold uppercase text-black">
+                    <Hash className="h-3 w-3" />
+                    CAMPAIGN HASHTAG CLUSTER
                   </span>
                   <button
                     type="button"
-                    onClick={() => handleCopy("all-tags", hashtags.join(" "))}
-                    className="text-[12px] font-medium text-[#0066CC] transition hover:underline"
+                    onClick={() => handleCopy("hashtags", hashtags.join(" "))}
+                    className="border border-black bg-white px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-black"
                   >
-                    {copiedId === "all-tags" ? "Copied all" : "Copy all"}
+                    {copiedId === "hashtags" ? "COPIED" : "COPY ALL"}
                   </button>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {hashtags.map((tag) => {
-                    const isCopied = copiedId === tag;
-                    return (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() => handleCopy(tag, tag)}
-                        className={cn(
-                          "rounded-full border px-3 py-1 text-[12px] font-medium transition",
-                          isCopied
-                            ? "border-[#248A3D]/30 bg-[#248A3D]/10 text-[#1D6F31]"
-                            : "border-black/[0.06] bg-white text-[#424245] hover:border-black/[0.2] hover:text-[#1D1D1F]"
-                        )}
-                      >
-                        {isCopied ? `✓ ${tag}` : tag}
-                      </button>
-                    );
-                  })}
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {hashtags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="border border-black bg-white px-2 py-0.5 font-mono text-[11px] font-bold text-black shadow-[1px_1px_0px_#000000]"
+                    >
+                      {tag}
+                    </span>
+                  ))}
                 </div>
               </div>
             )}
           </div>
 
-          {/* Classic Apple Export Footer */}
-          <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-black/[0.06] pt-4">
+          {/* Copy Full Deck Button */}
+          <div className="border-t-2 border-black pt-3">
             <button
               type="button"
               onClick={handleCopyFullDeck}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[#D2D2D7] bg-white px-4 py-2 text-[12px] font-medium text-[#1D1D1F] transition hover:border-[#86868B] hover:bg-[#F5F5F7]"
+              className="flex w-full items-center justify-center gap-2 border-2 border-black bg-white py-2 font-mono text-xs font-bold uppercase text-black shadow-[2px_2px_0px_#000000] hover:bg-gray-50"
             >
-              {copiedId === "full-deck" ? (
-                <>
-                  <Check className="h-3.5 w-3.5 text-[#248A3D]" />
-                  <span className="text-[#1D6F31]">Copied Deck</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3.5 w-3.5 text-[#6E6E73]" />
-                  <span>Copy All</span>
-                </>
-              )}
+              <Copy className="h-3.5 w-3.5" />
+              <span>{copiedId === "full-deck" ? "FULL DECK COPIED" : "COPY COMPLETE COPY DECK"}</span>
             </button>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={!assets}
-                onClick={onExportJson}
-                className="inline-flex items-center gap-1.5 rounded-full border border-[#D2D2D7] bg-white px-4 py-2 text-[12px] font-medium text-[#1D1D1F] transition hover:border-[#86868B] hover:bg-[#F5F5F7] disabled:opacity-40"
-              >
-                <FileJson className="h-3.5 w-3.5 text-[#6E6E73]" />
-                <span>JSON</span>
-              </button>
-              <button
-                type="button"
-                disabled={!assets || isExportingZip}
-                onClick={onExportZip}
-                className="inline-flex items-center gap-1.5 rounded-full bg-[#0071E3] px-4 py-2 text-[12px] font-medium text-white transition hover:bg-[#0077ED] disabled:opacity-40"
-              >
-                <Download className="h-3.5 w-3.5" />
-                <span>{isExportingZip ? "Packing…" : "Export Kit"}</span>
-              </button>
-            </div>
           </div>
         </div>
       )}

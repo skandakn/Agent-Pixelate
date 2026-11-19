@@ -153,6 +153,13 @@ function getTonePalette(motif: CreativeMotif, tone: BrandTone): ColorSwatch[] {
   return toneMap[tone];
 }
 
+export function getMockCampaignAssets(
+  brief: CampaignBrief,
+  campaignId: string = "camp_preview"
+): CampaignAssets {
+  return buildSimulatedCampaignAssets(brief, campaignId);
+}
+
 export function buildSimulatedCampaignAssets(
   brief: CampaignBrief,
   campaignId: string
