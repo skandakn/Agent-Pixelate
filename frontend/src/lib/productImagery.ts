@@ -353,8 +353,8 @@ const CATEGORY_TEMPLATES: Record<string, CategoryTemplate> = {
   },
 };
 
-export function detectProductCategory(brief: CampaignBrief): string {
-  const haystack = `${brief.productName} ${brief.productDescription}`.toLowerCase();
+export function detectProductCategory(brief?: CampaignBrief): string {
+  const haystack = `${brief?.productName || ""} ${brief?.productDescription || ""}`.toLowerCase();
   for (const [category, template] of Object.entries(CATEGORY_TEMPLATES)) {
     if (template.keywords.some((kw) => haystack.includes(kw))) {
       return category;
@@ -364,14 +364,14 @@ export function detectProductCategory(brief: CampaignBrief): string {
 }
 
 export function getProductVisualOptions(
-  brief: CampaignBrief,
-  campaignId: string
+  brief?: CampaignBrief,
+  campaignId?: string
 ): VisualOption[] {
   const category = detectProductCategory(brief);
   const template = CATEGORY_TEMPLATES[category] ?? CATEGORY_TEMPLATES.general_luxury;
 
-  return template.options.map((opt, idx) => ({
-    id: `${campaignId}-opt-${idx + 1}-${opt.style}`,
+  return (template?.options || []).map((opt, idx) => ({
+    id: `${campaignId || "camp"}-opt-${idx + 1}-${opt.style}`,
     label: opt.label,
     style: opt.style,
     imageUrl: opt.imageUrl,

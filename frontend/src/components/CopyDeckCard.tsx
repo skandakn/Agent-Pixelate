@@ -114,7 +114,7 @@ export function CopyDeckCard({
         <div className="flex gap-1.5">
           {tabs.map((tab) => {
             const active = activeTab === tab;
-            const inBrief = selectedPlatforms.includes(tab);
+            const inBrief = (selectedPlatforms || []).includes(tab);
             return (
               <button
                 key={tab}

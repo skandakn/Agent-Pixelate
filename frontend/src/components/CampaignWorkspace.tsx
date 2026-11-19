@@ -53,6 +53,65 @@ import { BandCollaborationRoom } from "@/components/BandCollaborationRoom";
 import { VisualShowcaseCard } from "@/components/VisualShowcaseCard";
 import { CopyDeckCard } from "@/components/CopyDeckCard";
 
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+  onReset?: () => void;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class WorkspaceErrorBoundary extends React.Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("WorkspaceErrorBoundary caught an error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="border-2 border-black bg-white p-8 text-center shadow-[4px_4px_0px_#000000]">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center border-2 border-black bg-[#EF4444] text-white shadow-[2px_2px_0px_#000000]">
+            <XCircle className="h-6 w-6" />
+          </div>
+          <h3 className="mt-4 font-display text-lg font-black uppercase text-black">
+            Interface Rendering Notice
+          </h3>
+          <p className="mx-auto mt-2 max-w-lg font-mono text-xs text-black/70">
+            {this.state.error?.message || "An unexpected render event occurred."}
+          </p>
+          <div className="mt-6 flex justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                this.setState({ hasError: false, error: null });
+                this.props.onReset?.();
+              }}
+              className="border-2 border-black bg-[#10B981] px-5 py-2 font-mono text-xs font-bold uppercase text-black shadow-[2px_2px_0px_#000000]"
+            >
+              Reset to Idle
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export function CampaignWorkspace() {
   const [brief, setBrief] = useState<CampaignBrief>(DEMO_PRESETS[0].brief);
   const [status, setStatus] = useState<CampaignStatus>("idle");
@@ -494,21 +553,29 @@ export function CampaignWorkspace() {
     if (liveBandRoom) {
       return {
         ...liveBandRoom,
-        memories: [...liveBandRoom.memories, ...localPinnedMemories],
-        brandMemories: [...liveBandRoom.brandMemories, ...localBrandMemories],
-        delegations: [...liveBandRoom.delegations, ...localDelegations],
+        memories: [...(liveBandRoom.memories || []), ...localPinnedMemories],
+        brandMemories: [...(liveBandRoom.brandMemories || []), ...localBrandMemories],
+        delegations: [...(liveBandRoom.delegations || []), ...localDelegations],
+        autoCriticQa: localAutoCritic,
+        policies: (liveBandRoom.policies || []).map((p) =>
+          localMutedHandles[p.handle] !== undefined
+            ? { ...p, muted: localMutedHandles[p.handle] }
+            : p
+        ),
       };
     }
     const defaultState = buildDefaultBandRoomState(campaignId, brief, status, handoff);
     return {
       ...defaultState,
-      memories: [...defaultState.memories, ...localPinnedMemories],
-      brandMemories: [...defaultState.brandMemories, ...localBrandMemories],
-      delegations: [...defaultState.delegations, ...localDelegations],
-      policies: {
-        ...defaultState.policies,
-        autoCriticQa: localAutoCritic,
-      },
+      memories: [...(defaultState.memories || []), ...localPinnedMemories],
+      brandMemories: [...(defaultState.brandMemories || []), ...localBrandMemories],
+      delegations: [...(defaultState.delegations || []), ...localDelegations],
+      autoCriticQa: localAutoCritic,
+      policies: (defaultState.policies || []).map((p) =>
+        localMutedHandles[p.handle] !== undefined
+          ? { ...p, muted: localMutedHandles[p.handle] }
+          : p
+      ),
     };
   }, [
     liveBandRoom,
@@ -516,6 +583,7 @@ export function CampaignWorkspace() {
     localBrandMemories,
     localDelegations,
     localAutoCritic,
+    localMutedHandles,
     campaignId,
     brief,
     status,
@@ -663,146 +731,148 @@ export function CampaignWorkspace() {
               </div>
             </motion.section>
           ) : (
-            <div className="space-y-6">
-              {/* Approva Action Rail & Compliance Checklist Strip */}
-              <div className="border-2 border-black bg-white p-4 shadow-[4px_4px_0px_#000000]">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="border border-black bg-[#10B981] px-2 py-1 font-mono text-[10px] font-black uppercase text-black">
-                      DOCKET #{campaignId || "PO-PIX-8491"}
-                    </div>
-                    <div>
-                      <h3 className="font-display text-base font-black uppercase tracking-tight text-black">
-                        {brief.productName}
-                      </h3>
-                      <p className="font-mono text-xs text-black/70">
-                        Target: {brief.platforms.join(" · ")} · Tone: {brief.brandTone}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Decision CTAs */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    {docketApprovalStatus === "approved" ? (
-                      <div className="flex items-center gap-1.5 border-2 border-black bg-[#D1FAE5] px-3.5 py-1.5 font-mono text-xs font-black uppercase text-black shadow-[2px_2px_0px_#000000]">
-                        <CheckCircle2 className="h-4 w-4 text-[#10B981]" />
-                        <span>APPROVED &amp; SHIPPED ({approvalStampTime || "NOW"})</span>
+            <WorkspaceErrorBoundary onReset={handleCancel}>
+              <div className="space-y-6">
+                {/* Approva Action Rail & Compliance Checklist Strip */}
+                <div className="border-2 border-black bg-white p-4 shadow-[4px_4px_0px_#000000]">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="border border-black bg-[#10B981] px-2 py-1 font-mono text-[10px] font-black uppercase text-black">
+                        DOCKET #{campaignId || "PO-PIX-8491"}
                       </div>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          onClick={handleApproveAndShip}
-                          className="inline-flex items-center gap-1.5 border-2 border-black bg-[#10B981] px-3.5 py-1.5 font-mono text-xs font-black uppercase text-black shadow-[2px_2px_0px_#000000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
-                        >
-                          <CheckCircle2 className="h-4 w-4" />
-                          <span>APPROVE &amp; SHIP</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setNeedsDetailDialogOpen(true)}
-                          className="inline-flex items-center gap-1.5 border-2 border-black bg-[#F59E0B] px-3 py-1.5 font-mono text-xs font-black uppercase text-black shadow-[2px_2px_0px_#000000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
-                        >
-                          <AlertTriangle className="h-4 w-4" />
-                          <span>NEEDS DETAIL</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleRejectDocket}
-                          className="inline-flex items-center gap-1.5 border-2 border-black bg-white px-3 py-1.5 font-mono text-xs font-bold uppercase text-[#EF4444] shadow-[2px_2px_0px_#000000] hover:bg-red-50"
-                        >
-                          <XCircle className="h-4 w-4" />
-                          <span>REJECT</span>
-                        </button>
-                      </>
-                    )}
+                      <div>
+                        <h3 className="font-display text-base font-black uppercase tracking-tight text-black">
+                          {brief?.productName || "CAMPAIGN DOCKET"}
+                        </h3>
+                        <p className="font-mono text-xs text-black/70">
+                          Target: {(brief?.platforms || []).join(" · ")} · Tone: {brief?.brandTone || "Minimalist"}
+                        </p>
+                      </div>
+                    </div>
 
-                    <button
-                      type="button"
-                      onClick={handleExportZip}
-                      disabled={isExportingZip}
-                      className="inline-flex items-center gap-1 border-2 border-black bg-white px-3 py-1.5 font-mono text-xs font-bold uppercase text-black shadow-[2px_2px_0px_#000000] hover:bg-gray-50"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      <span>{isExportingZip ? "PACKING..." : "EXPORT KIT"}</span>
-                    </button>
+                    {/* Decision CTAs */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {docketApprovalStatus === "approved" ? (
+                        <div className="flex items-center gap-1.5 border-2 border-black bg-[#D1FAE5] px-3.5 py-1.5 font-mono text-xs font-black uppercase text-black shadow-[2px_2px_0px_#000000]">
+                          <CheckCircle2 className="h-4 w-4 text-[#10B981]" />
+                          <span>APPROVED &amp; SHIPPED ({approvalStampTime || "NOW"})</span>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={handleApproveAndShip}
+                            className="inline-flex items-center gap-1.5 border-2 border-black bg-[#10B981] px-3.5 py-1.5 font-mono text-xs font-black uppercase text-black shadow-[2px_2px_0px_#000000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                            <span>APPROVE &amp; SHIP</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setNeedsDetailDialogOpen(true)}
+                            className="inline-flex items-center gap-1.5 border-2 border-black bg-[#F59E0B] px-3 py-1.5 font-mono text-xs font-black uppercase text-black shadow-[2px_2px_0px_#000000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
+                          >
+                            <AlertTriangle className="h-4 w-4" />
+                            <span>NEEDS DETAIL</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleRejectDocket}
+                            className="inline-flex items-center gap-1.5 border-2 border-black bg-white px-3 py-1.5 font-mono text-xs font-bold uppercase text-[#EF4444] shadow-[2px_2px_0px_#000000] hover:bg-red-50"
+                          >
+                            <XCircle className="h-4 w-4" />
+                            <span>REJECT</span>
+                          </button>
+                        </>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={handleExportZip}
+                        disabled={isExportingZip}
+                        className="inline-flex items-center gap-1 border-2 border-black bg-white px-3 py-1.5 font-mono text-xs font-bold uppercase text-black shadow-[2px_2px_0px_#000000] hover:bg-gray-50"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        <span>{isExportingZip ? "PACKING..." : "EXPORT KIT"}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Compact Approva Policy Checks Strip */}
+                  <div className="mt-3 grid grid-cols-2 gap-2 border-t border-black/20 pt-3 sm:grid-cols-4 font-mono text-[11px]">
+                    <div className="flex items-center justify-between border border-black bg-[#E6F7EB]/50 p-1.5">
+                      <span className="text-black/70">TONE ADHERENCE</span>
+                      <span className="font-bold text-[#10B981]">✓ 98% PASS</span>
+                    </div>
+                    <div className="flex items-center justify-between border border-black bg-[#E6F7EB]/50 p-1.5">
+                      <span className="text-black/70">WCAG CONTRAST</span>
+                      <span className="font-bold text-[#10B981]">✓ 14.2:1 AAA</span>
+                    </div>
+                    <div className="flex items-center justify-between border border-black bg-[#E6F7EB]/50 p-1.5">
+                      <span className="text-black/70">GUARDRAIL SCAN</span>
+                      <span className="font-bold text-[#10B981]">✓ ZERO CLAIMS</span>
+                    </div>
+                    <div className="flex items-center justify-between border border-black bg-[#E6F7EB]/50 p-1.5">
+                      <span className="text-black/70">ASSET DELIVERY</span>
+                      <span className="font-bold text-[#10B981]">✓ 3/3 + MP4</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Compact Approva Policy Checks Strip */}
-                <div className="mt-3 grid grid-cols-2 gap-2 border-t border-black/20 pt-3 sm:grid-cols-4 font-mono text-[11px]">
-                  <div className="flex items-center justify-between border border-black bg-[#E6F7EB]/50 p-1.5">
-                    <span className="text-black/70">TONE ADHERENCE</span>
-                    <span className="font-bold text-[#10B981]">✓ 98% PASS</span>
+                {/* Interactive BAND Shared Collaboration Room */}
+                <BandCollaborationRoom
+                  roomState={bandRoomState}
+                  events={events}
+                  status={status}
+                  isLiveBackend={isLiveBackend}
+                  isSendingMessage={isSendingBandMsg}
+                  isPinningMemory={isPinningMemory}
+                  isApproving={isApprovingHandoff}
+                  isRunningCritic={isRunningCritic}
+                  onSendMessage={handleSendBandMessage}
+                  onPinMemory={handlePinBandMemory}
+                  onPromoteMemory={handlePromoteMemory}
+                  onApproveHandoff={handleApproveHandoff}
+                  onPatchGovernance={handlePatchGovernance}
+                  onRunCritic={handleRunCritic}
+                  onExportAudit={handleExportAudit}
+                />
+
+                {/* Side-by-Side Bento Grid for Visual Showcase & Copy Deck */}
+                <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+                  <div className="xl:col-span-7">
+                    <VisualShowcaseCard
+                      campaignId={campaignId}
+                      brief={brief}
+                      creatives={creatives}
+                      videos={videos}
+                      palette={palette}
+                      artDirectionSummary={artDirectionSummary}
+                      storyboard={storyboard}
+                      isLoading={status === "running"}
+                      isLiveBackend={isLiveBackend}
+                      isRenderingCut={isRenderingCut}
+                      renderError={videoRenderError}
+                      onRenderCustomCut={handleRenderCustomCut}
+                    />
                   </div>
-                  <div className="flex items-center justify-between border border-black bg-[#E6F7EB]/50 p-1.5">
-                    <span className="text-black/70">WCAG CONTRAST</span>
-                    <span className="font-bold text-[#10B981]">✓ 14.2:1 AAA</span>
+                  <div className="xl:col-span-5">
+                    <CopyDeckCard
+                      assets={finalAssets}
+                      socialPosts={socialPosts}
+                      metaAds={metaAds}
+                      hashtags={hashtags}
+                      creatives={creatives}
+                      selectedPlatforms={brief?.platforms || []}
+                      isLoading={status === "running"}
+                      onExportJson={handleExportJson}
+                      onExportZip={handleExportZip}
+                      isExportingZip={isExportingZip}
+                    />
                   </div>
-                  <div className="flex items-center justify-between border border-black bg-[#E6F7EB]/50 p-1.5">
-                    <span className="text-black/70">GUARDRAIL SCAN</span>
-                    <span className="font-bold text-[#10B981]">✓ ZERO CLAIMS</span>
-                  </div>
-                  <div className="flex items-center justify-between border border-black bg-[#E6F7EB]/50 p-1.5">
-                    <span className="text-black/70">ASSET DELIVERY</span>
-                    <span className="font-bold text-[#10B981]">✓ 3/3 + MP4</span>
-                  </div>
-                </div>
+                </section>
               </div>
-
-              {/* Interactive BAND Shared Collaboration Room */}
-              <BandCollaborationRoom
-                roomState={bandRoomState}
-                events={events}
-                status={status}
-                isLiveBackend={isLiveBackend}
-                isSendingMessage={isSendingBandMsg}
-                isPinningMemory={isPinningMemory}
-                isApproving={isApprovingHandoff}
-                isRunningCritic={isRunningCritic}
-                onSendMessage={handleSendBandMessage}
-                onPinMemory={handlePinBandMemory}
-                onPromoteMemory={handlePromoteMemory}
-                onApproveHandoff={handleApproveHandoff}
-                onPatchGovernance={handlePatchGovernance}
-                onRunCritic={handleRunCritic}
-                onExportAudit={handleExportAudit}
-              />
-
-              {/* Side-by-Side Bento Grid for Visual Showcase & Copy Deck */}
-              <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-                <div className="xl:col-span-7">
-                  <VisualShowcaseCard
-                    campaignId={campaignId}
-                    brief={brief}
-                    creatives={creatives}
-                    videos={videos}
-                    palette={palette}
-                    artDirectionSummary={artDirectionSummary}
-                    storyboard={storyboard}
-                    isLoading={status === "running"}
-                    isLiveBackend={isLiveBackend}
-                    isRenderingCut={isRenderingCut}
-                    renderError={videoRenderError}
-                    onRenderCustomCut={handleRenderCustomCut}
-                  />
-                </div>
-                <div className="xl:col-span-5">
-                  <CopyDeckCard
-                    assets={finalAssets}
-                    socialPosts={socialPosts}
-                    metaAds={metaAds}
-                    hashtags={hashtags}
-                    creatives={creatives}
-                    selectedPlatforms={brief.platforms}
-                    isLoading={status === "running"}
-                    onExportJson={handleExportJson}
-                    onExportZip={handleExportZip}
-                    isExportingZip={isExportingZip}
-                  />
-                </div>
-              </section>
-            </div>
+            </WorkspaceErrorBoundary>
           )}
         </main>
       </div>
