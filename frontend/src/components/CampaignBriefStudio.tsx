@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { motion } from "framer-motion";
 import { Loader2, Sparkles, Square, X } from "lucide-react";
 import {
   BrandTone,
@@ -14,8 +13,8 @@ import { cn } from "@/lib/utils";
 
 const BRAND_TONES: BrandTone[] = ["Bold", "Minimalist", "Luxury", "Playful"];
 const PLATFORMS: { id: Platform; desc: string }[] = [
-  { id: "Instagram", desc: "Carousels & Reels" },
-  { id: "LinkedIn", desc: "Editorial & Founder" },
+  { id: "Instagram", desc: "Feed & Reels" },
+  { id: "LinkedIn", desc: "Post & Article" },
   { id: "Meta Ads", desc: "Direct Response" },
 ];
 
@@ -68,29 +67,19 @@ export function CampaignBriefStudio({
   const studioContent = (
     <form
       onSubmit={handleSubmit}
-      className="flex h-full flex-col justify-between gap-5 overflow-y-auto bg-white p-5 font-sans"
+      className="flex h-full flex-col justify-between overflow-y-auto bg-white p-5 font-sans"
     >
       <div className="space-y-5">
-        {/* Studio Header */}
-        <div className="flex items-start justify-between gap-2 border-b-2 border-black pb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="border border-black bg-[#10B981] px-1.5 py-0.5 font-mono text-[10px] font-black uppercase text-black">
-                CONFIG
-              </span>
-              <h2 className="font-display text-base font-black uppercase tracking-tight text-black">
-                Campaign Brief Specification
-              </h2>
-            </div>
-            <p className="mt-1 font-mono text-xs text-black/70">
-              Input parameters to instruct @VisualAgent &amp; @CopyAgent in the BAND room.
-            </p>
-          </div>
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-black/[0.06] pb-3">
+          <h2 className="text-sm font-semibold tracking-tight text-[#1D1D1F]">
+            Campaign Brief
+          </h2>
           {onCloseMobile && (
             <button
               type="button"
               onClick={onCloseMobile}
-              className="border-2 border-black bg-white p-1 text-black shadow-[2px_2px_0px_#000000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none lg:hidden"
+              className="rounded-lg p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 lg:hidden"
               aria-label="Close brief drawer"
             >
               <X className="h-4 w-4" />
@@ -98,12 +87,12 @@ export function CampaignBriefStudio({
           )}
         </div>
 
-        {/* Presets */}
+        {/* Templates */}
         <div className="space-y-2">
-          <span className="block font-mono text-[11px] font-bold uppercase tracking-wider text-black">
-            Pre-Approved Campaign Templates
-          </span>
-          <div className="grid grid-cols-1 gap-2">
+          <label className="block text-xs font-medium text-neutral-500">
+            Presets
+          </label>
+          <div className="grid grid-cols-1 gap-1.5">
             {DEMO_PRESETS.map((preset) => {
               const isSelected =
                 brief.productName === preset.brief.productName &&
@@ -115,23 +104,28 @@ export function CampaignBriefStudio({
                   disabled={isRunning}
                   onClick={() => applyPreset(preset.brief)}
                   className={cn(
-                    "group flex items-center justify-between border-2 border-black p-2.5 text-left transition-all",
+                    "flex items-center justify-between rounded-xl border p-2.5 text-left transition-all",
                     isSelected
-                      ? "bg-[#D1FAE5] shadow-[3px_3px_0px_#000000]"
-                      : "bg-white shadow-[2px_2px_0px_#000000] hover:bg-[#F3F4F6] hover:translate-x-[1px] hover:translate-y-[1px]",
+                      ? "border-neutral-900 bg-neutral-900 text-white shadow-sm"
+                      : "border-black/[0.06] bg-[#FBFBFD] text-neutral-800 hover:bg-neutral-100/70",
                     isRunning && "cursor-not-allowed opacity-50"
                   )}
                 >
                   <div className="min-w-0 pr-2">
-                    <div className="truncate font-display text-[13px] font-bold text-black">
+                    <div className="truncate text-xs font-semibold">
                       {preset.label}
                     </div>
-                    <div className="truncate font-mono text-[11px] text-black/60">
+                    <div
+                      className={cn(
+                        "truncate text-[11px]",
+                        isSelected ? "text-neutral-300" : "text-neutral-500"
+                      )}
+                    >
                       {preset.tagline}
                     </div>
                   </div>
                   <span
-                    className="h-3 w-3 shrink-0 border border-black shadow-[1px_1px_0px_#000000]"
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
                     style={{ backgroundColor: preset.accentHex }}
                   />
                 </button>
@@ -144,9 +138,9 @@ export function CampaignBriefStudio({
         <div className="space-y-1.5">
           <label
             htmlFor="productName"
-            className="block font-mono text-[11px] font-bold uppercase tracking-wider text-black"
+            className="block text-xs font-medium text-neutral-500"
           >
-            Product / Offering Identifier
+            Product
           </label>
           <input
             id="productName"
@@ -157,8 +151,8 @@ export function CampaignBriefStudio({
             onChange={(e) =>
               onChangeBrief({ ...brief, productName: e.target.value })
             }
-            placeholder="e.g. Aura Soundbar Spatial"
-            className="w-full border-2 border-black bg-white px-3 py-2 font-mono text-sm text-black placeholder-black/40 shadow-[2px_2px_0px_#000000] outline-none transition focus:bg-[#E6F7EB] disabled:bg-gray-100 disabled:opacity-50"
+            placeholder="e.g. Aura Spatial Audio"
+            className="w-full rounded-xl border border-black/[0.08] bg-neutral-50/50 px-3.5 py-2 text-sm text-[#1D1D1F] placeholder-neutral-400 outline-none transition focus:border-neutral-400 focus:bg-white focus:ring-1 focus:ring-neutral-400 disabled:opacity-50"
           />
         </div>
 
@@ -167,25 +161,25 @@ export function CampaignBriefStudio({
           <div className="flex items-center justify-between">
             <label
               htmlFor="productDescription"
-              className="block font-mono text-[11px] font-bold uppercase tracking-wider text-black"
+              className="block text-xs font-medium text-neutral-500"
             >
-              Creative Story &amp; Value Proposition
+              Description
             </label>
-            <span className="font-mono text-[10px] text-black/60">
+            <span className="text-[10px] text-neutral-400">
               {brief.productDescription.length} chars
             </span>
           </div>
           <textarea
             id="productDescription"
-            rows={4}
+            rows={3}
             required
             disabled={isRunning}
             value={brief.productDescription}
             onChange={(e) =>
               onChangeBrief({ ...brief, productDescription: e.target.value })
             }
-            placeholder="Define core features, materials, acoustic architecture, and customer benefit..."
-            className="w-full resize-none border-2 border-black bg-white px-3 py-2 font-mono text-xs leading-relaxed text-black placeholder-black/40 shadow-[2px_2px_0px_#000000] outline-none transition focus:bg-[#E6F7EB] disabled:bg-gray-100 disabled:opacity-50"
+            placeholder="Key features, materials, customer benefits..."
+            className="w-full resize-none rounded-xl border border-black/[0.08] bg-neutral-50/50 px-3.5 py-2 text-xs leading-relaxed text-[#1D1D1F] placeholder-neutral-400 outline-none transition focus:border-neutral-400 focus:bg-white focus:ring-1 focus:ring-neutral-400 disabled:opacity-50"
           />
         </div>
 
@@ -193,9 +187,9 @@ export function CampaignBriefStudio({
         <div className="space-y-1.5">
           <label
             htmlFor="targetAudience"
-            className="block font-mono text-[11px] font-bold uppercase tracking-wider text-black"
+            className="block text-xs font-medium text-neutral-500"
           >
-            Target Audience Segment
+            Audience
           </label>
           <input
             id="targetAudience"
@@ -205,17 +199,17 @@ export function CampaignBriefStudio({
             onChange={(e) =>
               onChangeBrief({ ...brief, targetAudience: e.target.value })
             }
-            placeholder="e.g. Audiophiles, interior architects, premium design lovers"
-            className="w-full border-2 border-black bg-white px-3 py-2 font-mono text-xs text-black placeholder-black/40 shadow-[2px_2px_0px_#000000] outline-none transition focus:bg-[#E6F7EB] disabled:bg-gray-100 disabled:opacity-50"
+            placeholder="e.g. Designers, creators, minimalists"
+            className="w-full rounded-xl border border-black/[0.08] bg-neutral-50/50 px-3.5 py-2 text-xs text-[#1D1D1F] placeholder-neutral-400 outline-none transition focus:border-neutral-400 focus:bg-white focus:ring-1 focus:ring-neutral-400 disabled:opacity-50"
           />
         </div>
 
         {/* Brand Tone Selector */}
         <div className="space-y-2">
-          <span className="block font-mono text-[11px] font-bold uppercase tracking-wider text-black">
-            Brand Tone Matrix
-          </span>
-          <div className="grid grid-cols-2 gap-2">
+          <label className="block text-xs font-medium text-neutral-500">
+            Tone
+          </label>
+          <div className="grid grid-cols-2 gap-1.5">
             {BRAND_TONES.map((tone) => {
               const active = brief.brandTone === tone;
               return (
@@ -225,10 +219,10 @@ export function CampaignBriefStudio({
                   disabled={isRunning}
                   onClick={() => onChangeBrief({ ...brief, brandTone: tone })}
                   className={cn(
-                    "border-2 border-black px-3 py-2 font-mono text-xs font-bold uppercase transition-all",
+                    "rounded-xl border py-2 text-xs font-medium transition-all",
                     active
-                      ? "bg-[#10B981] text-black shadow-[3px_3px_0px_#000000]"
-                      : "bg-white text-black shadow-[2px_2px_0px_#000000] hover:bg-gray-50",
+                      ? "border-neutral-900 bg-neutral-900 text-white shadow-sm"
+                      : "border-black/[0.06] bg-[#FBFBFD] text-neutral-700 hover:bg-neutral-100",
                     isRunning && "cursor-not-allowed opacity-50"
                   )}
                 >
@@ -239,20 +233,22 @@ export function CampaignBriefStudio({
           </div>
         </div>
 
-        {/* Platform Switches */}
+        {/* Channels */}
         <div className="space-y-2">
-          <span className="block font-mono text-[11px] font-bold uppercase tracking-wider text-black">
-            Distribution Channels
-          </span>
-          <div className="space-y-2">
+          <label className="block text-xs font-medium text-neutral-500">
+            Channels
+          </label>
+          <div className="space-y-1.5">
             {PLATFORMS.map(({ id, desc }) => {
               const checked = brief.platforms.includes(id);
               return (
                 <label
                   key={id}
                   className={cn(
-                    "flex cursor-pointer items-center justify-between border-2 border-black p-2.5 shadow-[2px_2px_0px_#000000] transition-all hover:bg-gray-50",
-                    checked ? "bg-[#D1FAE5]" : "bg-white",
+                    "flex cursor-pointer items-center justify-between rounded-xl border p-2.5 transition-all",
+                    checked
+                      ? "border-black/[0.12] bg-neutral-50"
+                      : "border-black/[0.06] bg-white hover:bg-neutral-50/50",
                     isRunning && "pointer-events-none opacity-50"
                   )}
                 >
@@ -263,15 +259,17 @@ export function CampaignBriefStudio({
                     className="sr-only"
                   />
                   <div>
-                    <div className="font-display text-xs font-black uppercase text-black">
+                    <div className="text-xs font-semibold text-[#1D1D1F]">
                       {id}
                     </div>
-                    <div className="font-mono text-[11px] text-black/60">{desc}</div>
+                    <div className="text-[11px] text-neutral-400">{desc}</div>
                   </div>
                   <div
                     className={cn(
-                      "flex h-5 w-5 items-center justify-center border-2 border-black font-mono text-xs font-black",
-                      checked ? "bg-black text-white" : "bg-white"
+                      "flex h-4 w-4 items-center justify-center rounded-md border text-[10px] font-bold transition-colors",
+                      checked
+                        ? "border-neutral-900 bg-neutral-900 text-white"
+                        : "border-neutral-300 bg-white"
                     )}
                   >
                     {checked ? "✓" : ""}
@@ -283,11 +281,11 @@ export function CampaignBriefStudio({
         </div>
 
         {/* Human Gate */}
-        <div className="space-y-2 border-t-2 border-black pt-4">
+        <div className="border-t border-black/[0.06] pt-3">
           <label
             className={cn(
-              "flex cursor-pointer items-center justify-between border-2 border-black bg-white p-2.5 shadow-[2px_2px_0px_#000000] transition-all hover:bg-gray-50",
-              brief.requireHandoffApproval && "bg-[#FEF3C7]",
+              "flex cursor-pointer items-center justify-between rounded-xl border border-black/[0.06] p-2.5 transition-all",
+              brief.requireHandoffApproval ? "bg-amber-50/60 border-amber-200" : "bg-white hover:bg-neutral-50/60",
               isRunning && "pointer-events-none opacity-50"
             )}
           >
@@ -303,17 +301,19 @@ export function CampaignBriefStudio({
               className="sr-only"
             />
             <div className="pr-3">
-              <div className="font-display text-xs font-black uppercase text-black">
-                Fintech Human Gate
+              <div className="text-xs font-medium text-neutral-800">
+                Approval Gate
               </div>
-              <div className="font-mono text-[11px] text-black/60">
-                Hold pipeline for sign-off before @CopyAgent handoff
+              <div className="text-[11px] text-neutral-400">
+                Review visual assets before copy handoff
               </div>
             </div>
             <div
               className={cn(
-                "flex h-5 w-5 items-center justify-center border-2 border-black font-mono text-xs font-black",
-                brief.requireHandoffApproval ? "bg-black text-white" : "bg-white"
+                "flex h-4 w-4 items-center justify-center rounded-md border text-[10px] font-bold transition-colors",
+                brief.requireHandoffApproval
+                  ? "border-neutral-900 bg-neutral-900 text-white"
+                  : "border-neutral-300 bg-white"
               )}
             >
               {brief.requireHandoffApproval ? "✓" : ""}
@@ -322,35 +322,35 @@ export function CampaignBriefStudio({
         </div>
       </div>
 
-      {/* Primary Brutalist Launch Button */}
-      <div className="sticky bottom-0 -mx-5 border-t-2 border-black bg-white px-5 pb-2 pt-4">
+      {/* Action Button */}
+      <div className="sticky bottom-0 -mx-5 border-t border-black/[0.06] bg-white px-5 pb-2 pt-4">
         {isRunning ? (
           <div className="flex gap-2">
             <button
               type="button"
               disabled
-              className="flex flex-1 items-center justify-center gap-2 border-2 border-black bg-[#F59E0B] py-3 font-mono text-xs font-black uppercase tracking-wider text-black shadow-[3px_3px_0px_#000000]"
+              className="flex flex-1 items-center justify-center gap-2 rounded-full bg-neutral-900 py-2.5 text-xs font-medium text-white shadow-sm"
             >
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>ORCHESTRATING RUN...</span>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <span>Orchestrating...</span>
             </button>
             <button
               type="button"
               onClick={onCancel}
-              title="Abort execution"
-              className="flex h-11 w-11 items-center justify-center border-2 border-black bg-[#EF4444] text-white shadow-[3px_3px_0px_#000000] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
+              title="Cancel execution"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-600 shadow-sm transition hover:bg-neutral-100"
             >
-              <Square className="h-4 w-4 fill-current" />
+              <Square className="h-3.5 w-3.5 fill-current" />
             </button>
           </div>
         ) : (
           <button
             type="submit"
             disabled={!canLaunch}
-            className="flex w-full items-center justify-center gap-2 border-2 border-black bg-[#10B981] py-3 font-mono text-xs font-black uppercase tracking-widest text-black shadow-[4px_4px_0px_#000000] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_#000000] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none disabled:cursor-not-allowed disabled:bg-gray-300 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-[#0071E3] py-2.5 text-xs font-medium text-white shadow-sm transition hover:bg-[#0077ED] active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-neutral-200 disabled:text-neutral-400"
           >
-            <Sparkles className="h-4 w-4" />
-            <span>DISPATCH MULTI-AGENT RUN</span>
+            <Sparkles className="h-3.5 w-3.5" />
+            <span>Generate Campaign</span>
           </button>
         )}
       </div>
@@ -360,7 +360,7 @@ export function CampaignBriefStudio({
   return (
     <>
       {/* Desktop Sticky Left Studio Panel */}
-      <aside className="hidden w-[360px] shrink-0 border-r-2 border-black bg-white lg:block">
+      <aside className="hidden w-[340px] shrink-0 border-r border-black/[0.08] bg-white lg:block">
         <div className="sticky top-14 h-[calc(100vh-3.5rem)]">{studioContent}</div>
       </aside>
 
@@ -368,10 +368,10 @@ export function CampaignBriefStudio({
       {mobileOpen && (
         <div className="fixed inset-0 z-50 flex lg:hidden">
           <div
-            className="fixed inset-0 bg-black/50"
+            className="fixed inset-0 bg-black/30 backdrop-blur-sm"
             onClick={onCloseMobile}
           />
-          <aside className="relative z-10 h-full w-[88vw] max-w-[360px] border-r-2 border-black bg-white shadow-2xl">
+          <aside className="relative z-10 h-full w-[88vw] max-w-[340px] border-r border-black/[0.08] bg-white shadow-xl">
             {studioContent}
           </aside>
         </div>

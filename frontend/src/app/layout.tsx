@@ -16,9 +16,9 @@ import "./globals.css";
 import { ClerkAuthProvider } from "@/components/ClerkAuthProvider";
 
 export const metadata: Metadata = {
-  title: "Approva × Agent Pixelate — Multi-Agent Approval Ops",
+  title: "Pixelate — Autonomous Multi-Agent Marketing Studio",
   description:
-    "Auditable, fintech-ops multi-agent studio for orchestrating @visual_pixelate and @copy_pixelate inside a real-time BAND shared room.",
+    "Orchestrate visual direction, high-converting copy, and cinematic video with autonomous collaborative AI agents.",
 };
 
 export default function RootLayout({
@@ -28,7 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-[#E6F7EB] font-sans text-black antialiased selection:bg-[#10B981] selection:text-black">
+      <body className="min-h-screen bg-[#FBFBFD] font-sans text-[#1D1D1F] antialiased selection:bg-[#0071E3] selection:text-white">
         <ClerkAuthProvider>{children}</ClerkAuthProvider>
       </body>
     </html>

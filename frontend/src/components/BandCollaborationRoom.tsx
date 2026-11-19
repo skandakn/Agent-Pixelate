@@ -176,49 +176,46 @@ export function BandCollaborationRoom({
   const hopRatioPct = Math.min(100, Math.round((currentHops / maxHops) * 100));
 
   return (
-    <section className="overflow-hidden border-2 border-black bg-white shadow-[4px_4px_0px_#000000]">
-      {/* Approva Brutalist Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-black bg-[#E6F7EB] px-5 py-3.5">
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center border-2 border-black bg-white shadow-[2px_2px_0px_#000000]">
-            <MessageSquare className="h-4 w-4" />
+    <section className="overflow-hidden rounded-2xl border border-black/[0.08] bg-white shadow-sm">
+      {/* Apple Minimalist Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] bg-[#FBFBFD] px-5 py-3">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-neutral-900 text-white">
+            <MessageSquare className="h-3.5 w-3.5" />
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="font-display text-sm font-black uppercase tracking-tight text-black">
-                BAND SHARED ROOM &amp; AGENTIC CONTROL PLANE
+              <h3 className="text-xs font-semibold text-[#1D1D1F]">
+                Agent Collaboration Room
               </h3>
-              <span className="border border-black bg-white px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-black">
-                {roomState?.roomId || "BAND ROOM"}
+              <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-600">
+                {roomState?.roomId || "BAND Room"}
               </span>
               {roomState?.criticReport && (
-                <span className="border border-black bg-[#10B981] px-2 py-0.5 font-mono text-[10px] font-black uppercase text-black">
-                  QA {roomState.criticReport.overallScore}/100 ({roomState.criticReport.grade})
+                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                  QA {roomState.criticReport.overallScore}/100
                 </span>
               )}
             </div>
-            <p className="font-mono text-xs text-black/70">
-              Heterogeneous Multi-Agent Mesh — Focus Windows, Merkle Audit Chain &amp; LoopGuard Critic.
-            </p>
           </div>
         </div>
 
-        {/* 4-Tab Brutalist Switcher */}
-        <div className="flex flex-wrap gap-1.5">
+        {/* Minimalist Switcher */}
+        <div className="flex rounded-full bg-neutral-100 p-0.5 text-xs font-medium">
           {(
             [
-              { id: "chat", label: `ROOM (${visibleMessages.length})`, icon: MessageSquare },
+              { id: "chat", label: `Room (${visibleMessages.length})`, icon: MessageSquare },
               {
                 id: "memory",
-                label: `MEMORY (${memoriesList.length + brandMemoriesList.length})`,
+                label: `Memory (${memoriesList.length + brandMemoriesList.length})`,
                 icon: Database,
               },
               {
                 id: "executions",
-                label: `FOCUS (${executionsList.length})`,
+                label: `Focus (${executionsList.length})`,
                 icon: Cpu,
               },
-              { id: "control", label: "CONTROL", icon: Shield },
+              { id: "control", label: "Control", icon: Shield },
             ] as const
           ).map((tab) => {
             const Icon = tab.icon;
@@ -229,13 +226,13 @@ export function BandCollaborationRoom({
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  "inline-flex items-center gap-1.5 border-2 border-black px-3 py-1 font-mono text-xs font-bold uppercase transition-all",
+                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs transition-all",
                   active
-                    ? "bg-[#10B981] text-black shadow-[2px_2px_0px_#000000]"
-                    : "bg-white text-black hover:bg-gray-100"
+                    ? "bg-white text-neutral-900 shadow-sm font-semibold"
+                    : "text-neutral-500 hover:text-neutral-800"
                 )}
               >
-                <Icon className="h-3.5 w-3.5" />
+                <Icon className="h-3 w-3" />
                 <span>{tab.label}</span>
               </button>
             );

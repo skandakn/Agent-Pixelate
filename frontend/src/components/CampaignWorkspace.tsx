@@ -137,6 +137,7 @@ export function CampaignWorkspace() {
   const [approvalStampTime, setApprovalStampTime] = useState<string | null>(null);
   const [needsDetailDialogOpen, setNeedsDetailDialogOpen] = useState(false);
   const [needsDetailFeedback, setNeedsDetailFeedback] = useState("");
+  const [showAgentRoom, setShowAgentRoom] = useState(false);
 
   // BAND Shared Room live state
   const [liveBandRoom, setLiveBandRoom] = useState<BandRoomState | null>(null);
@@ -637,31 +638,27 @@ export function CampaignWorkspace() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, ease: "easeOut" }}
-              className="border-2 border-black bg-white p-7 shadow-[4px_4px_0px_#000000] sm:p-12"
+              className="rounded-3xl border border-black/[0.08] bg-white p-8 shadow-sm sm:p-14"
             >
-              <div className="mx-auto max-w-3xl text-center">
-                <div className="inline-flex items-center gap-2 border-2 border-black bg-[#E6F7EB] px-3.5 py-1 font-mono text-xs font-bold uppercase text-black shadow-[2px_2px_0px_#000000]">
-                  <Sparkles className="h-3.5 w-3.5 text-[#10B981]" />
-                  <span>Approva × Agent Pixelate · Powered by BAND</span>
+              <div className="mx-auto max-w-2xl text-center">
+                <div className="inline-flex items-center gap-2 rounded-full border border-black/[0.06] bg-neutral-50 px-3.5 py-1 text-xs font-medium text-neutral-600 shadow-sm">
+                  <Sparkles className="h-3.5 w-3.5 text-[#0071E3]" />
+                  <span>Creative Intelligence</span>
                 </div>
 
-                <h2 className="mt-4 font-display text-3xl font-black uppercase tracking-tight text-black sm:text-5xl">
-                  Two agents. One room.
-                  <br />
-                  Total creative control.
+                <h2 className="mt-4 text-4xl font-semibold tracking-tight text-[#1D1D1F] sm:text-5xl">
+                  Campaigns, orchestrated.
                 </h2>
 
-                <p className="mx-auto mt-4 max-w-2xl font-mono text-xs leading-relaxed text-black/70 sm:text-sm">
-                  Work directly alongside <span className="font-bold text-black">@visual_pixelate</span> and{" "}
-                  <span className="font-bold text-black">@copy_pixelate</span> inside a live BAND shared room—delegate via @mentions,
-                  pin shared brand guardrails into memory, and approve handoffs with full fintech auditability.
+                <p className="mx-auto mt-4 max-w-lg text-sm leading-relaxed text-neutral-500">
+                  Autonomous visual direction, conversion copy, and cinematic video. All crafted in harmony.
                 </p>
 
                 <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
                   <button
                     type="button"
                     onClick={() => handleLaunch()}
-                    className="inline-flex items-center justify-center gap-2 border-2 border-black bg-[#10B981] px-6 py-2.5 font-mono text-xs font-black uppercase text-black shadow-[4px_4px_0px_#000000] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_#000000]"
+                    className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0071E3] px-6 py-2.5 text-xs font-medium text-white shadow-sm transition hover:bg-[#0077ED] active:scale-[0.99]"
                   >
                     <Sparkles className="h-4 w-4" />
                     <span>Launch Campaign</span>
@@ -669,174 +666,143 @@ export function CampaignWorkspace() {
                   <button
                     type="button"
                     onClick={() => setMobileDrawerOpen(true)}
-                    className="inline-flex items-center justify-center border-2 border-black bg-white px-5 py-2.5 font-mono text-xs font-bold uppercase text-black shadow-[2px_2px_0px_#000000] lg:hidden"
+                    className="inline-flex items-center justify-center rounded-full border border-black/[0.08] bg-white px-5 py-2.5 text-xs font-medium text-neutral-700 shadow-sm transition hover:bg-neutral-50 lg:hidden"
                   >
                     Edit Brief
                   </button>
                 </div>
               </div>
 
-              {/* Presets in Approva Brutalist Style */}
-              <div className="mx-auto mt-10 grid max-w-4xl grid-cols-1 gap-4 md:grid-cols-3">
+              {/* Presets in Apple Card Style */}
+              <div className="mx-auto mt-12 grid max-w-3xl grid-cols-1 gap-4 md:grid-cols-3">
                 {DEMO_PRESETS.map((preset) => (
                   <button
                     key={preset.id}
                     type="button"
                     onClick={() => handleLaunch(preset.brief)}
-                    className="group flex flex-col justify-between border-2 border-black bg-white p-5 text-left shadow-[3px_3px_0px_#000000] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_#000000]"
+                    className="group flex flex-col justify-between rounded-2xl border border-black/[0.06] bg-[#FBFBFD] p-5 text-left transition-all hover:border-black/[0.12] hover:bg-white hover:shadow-md"
                   >
                     <div>
-                      <div className="flex items-center justify-between border-b border-black pb-2">
+                      <div className="flex items-center justify-between pb-3">
                         <span
-                          className="h-3.5 w-3.5 border border-black shadow-[1px_1px_0px_#000000]"
+                          className="h-3 w-3 rounded-full"
                           style={{ backgroundColor: preset.accentHex }}
                         />
-                        <span className="border border-black bg-[#E6F7EB] px-1.5 py-0.2 font-mono text-[9px] font-bold uppercase text-black">
+                        <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-600">
                           {preset.brief.brandTone}
                         </span>
                       </div>
-                      <h3 className="mt-3 font-display text-sm font-black uppercase text-black">
+                      <h3 className="text-sm font-semibold text-[#1D1D1F]">
                         {preset.label}
                       </h3>
-                      <p className="mt-1 font-mono text-[11px] leading-relaxed text-black/70">
+                      <p className="mt-1 text-xs leading-relaxed text-neutral-500">
                         {preset.tagline}
                       </p>
                     </div>
-                    <div className="mt-4 flex items-center justify-between border-t border-black pt-2 font-mono text-xs font-bold uppercase text-black">
-                      <span>Launch Demo</span>
-                      <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                    <div className="mt-5 flex items-center justify-between text-xs font-medium text-neutral-600 group-hover:text-neutral-900">
+                      <span>Explore</span>
+                      <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                     </div>
                   </button>
                 ))}
-              </div>
-
-              {/* Restrained Feature Spec Row */}
-              <div className="mx-auto mt-8 flex max-w-3xl flex-wrap items-center justify-center gap-x-8 gap-y-3 border-t-2 border-black pt-5 font-mono text-xs font-bold uppercase text-black/80">
-                <span className="inline-flex items-center gap-1.5">
-                  <Users className="h-4 w-4 text-black" />
-                  Live BAND Room &amp; Shared Memory
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <Palette className="h-4 w-4 text-black" />
-                  3 Aspect Creatives &amp; MP4 Video Studio
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <PenTool className="h-4 w-4 text-black" />
-                  Instagram, LinkedIn &amp; Meta Ads
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <Layers className="h-4 w-4 text-black" />
-                  JSON &amp; ZIP Campaign Kit
-                </span>
               </div>
             </motion.section>
           ) : (
             <WorkspaceErrorBoundary onReset={handleCancel}>
               <div className="space-y-6">
-                {/* Approva Action Rail & Compliance Checklist Strip */}
-                <div className="border-2 border-black bg-white p-4 shadow-[4px_4px_0px_#000000]">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="border border-black bg-[#10B981] px-2 py-1 font-mono text-[10px] font-black uppercase text-black">
-                        DOCKET #{campaignId || "PO-PIX-8491"}
-                      </div>
-                      <div>
-                        <h3 className="font-display text-base font-black uppercase tracking-tight text-black">
-                          {brief?.productName || "CAMPAIGN DOCKET"}
-                        </h3>
-                        <p className="font-mono text-xs text-black/70">
-                          Target: {(brief?.platforms || []).join(" · ")} · Tone: {brief?.brandTone || "Minimalist"}
-                        </p>
-                      </div>
+                {/* Sleek Campaign Action Bar */}
+                <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-black/[0.08] bg-white px-5 py-3.5 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-neutral-900 text-white shadow-sm">
+                      <Sparkles className="h-4 w-4" />
                     </div>
-
-                    {/* Decision CTAs */}
-                    <div className="flex flex-wrap items-center gap-2">
-                      {docketApprovalStatus === "approved" ? (
-                        <div className="flex items-center gap-1.5 border-2 border-black bg-[#D1FAE5] px-3.5 py-1.5 font-mono text-xs font-black uppercase text-black shadow-[2px_2px_0px_#000000]">
-                          <CheckCircle2 className="h-4 w-4 text-[#10B981]" />
-                          <span>APPROVED &amp; SHIPPED ({approvalStampTime || "NOW"})</span>
-                        </div>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            onClick={handleApproveAndShip}
-                            className="inline-flex items-center gap-1.5 border-2 border-black bg-[#10B981] px-3.5 py-1.5 font-mono text-xs font-black uppercase text-black shadow-[2px_2px_0px_#000000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
-                          >
-                            <CheckCircle2 className="h-4 w-4" />
-                            <span>APPROVE &amp; SHIP</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setNeedsDetailDialogOpen(true)}
-                            className="inline-flex items-center gap-1.5 border-2 border-black bg-[#F59E0B] px-3 py-1.5 font-mono text-xs font-black uppercase text-black shadow-[2px_2px_0px_#000000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
-                          >
-                            <AlertTriangle className="h-4 w-4" />
-                            <span>NEEDS DETAIL</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleRejectDocket}
-                            className="inline-flex items-center gap-1.5 border-2 border-black bg-white px-3 py-1.5 font-mono text-xs font-bold uppercase text-[#EF4444] shadow-[2px_2px_0px_#000000] hover:bg-red-50"
-                          >
-                            <XCircle className="h-4 w-4" />
-                            <span>REJECT</span>
-                          </button>
-                        </>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={handleExportZip}
-                        disabled={isExportingZip}
-                        className="inline-flex items-center gap-1 border-2 border-black bg-white px-3 py-1.5 font-mono text-xs font-bold uppercase text-black shadow-[2px_2px_0px_#000000] hover:bg-gray-50"
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                        <span>{isExportingZip ? "PACKING..." : "EXPORT KIT"}</span>
-                      </button>
+                    <div>
+                      <h3 className="text-sm font-semibold text-[#1D1D1F]">
+                        {brief?.productName || "Active Campaign"}
+                      </h3>
+                      <p className="text-xs text-neutral-400">
+                        {(brief?.platforms || []).join(" · ")} · {brief?.brandTone || "Minimalist"}
+                      </p>
                     </div>
                   </div>
 
-                  {/* Compact Approva Policy Checks Strip */}
-                  <div className="mt-3 grid grid-cols-2 gap-2 border-t border-black/20 pt-3 sm:grid-cols-4 font-mono text-[11px]">
-                    <div className="flex items-center justify-between border border-black bg-[#E6F7EB]/50 p-1.5">
-                      <span className="text-black/70">TONE ADHERENCE</span>
-                      <span className="font-bold text-[#10B981]">✓ 98% PASS</span>
-                    </div>
-                    <div className="flex items-center justify-between border border-black bg-[#E6F7EB]/50 p-1.5">
-                      <span className="text-black/70">WCAG CONTRAST</span>
-                      <span className="font-bold text-[#10B981]">✓ 14.2:1 AAA</span>
-                    </div>
-                    <div className="flex items-center justify-between border border-black bg-[#E6F7EB]/50 p-1.5">
-                      <span className="text-black/70">GUARDRAIL SCAN</span>
-                      <span className="font-bold text-[#10B981]">✓ ZERO CLAIMS</span>
-                    </div>
-                    <div className="flex items-center justify-between border border-black bg-[#E6F7EB]/50 p-1.5">
-                      <span className="text-black/70">ASSET DELIVERY</span>
-                      <span className="font-bold text-[#10B981]">✓ 3/3 + MP4</span>
-                    </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {docketApprovalStatus === "approved" ? (
+                      <div className="flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3.5 py-1.5 text-xs font-medium text-emerald-800">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                        <span>Approved ({approvalStampTime || "Now"})</span>
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleApproveAndShip}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-neutral-900 px-3.5 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-black transition"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          <span>Approve</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNeedsDetailDialogOpen(true)}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-black/[0.08] bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition"
+                        >
+                          <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                          <span>Revise</span>
+                        </button>
+                      </>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => setShowAgentRoom((v) => !v)}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-black/[0.08] bg-white px-3.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 shadow-sm transition"
+                    >
+                      <Users className="h-3.5 w-3.5 text-neutral-500" />
+                      <span>{showAgentRoom ? "Hide Agents" : "Agents"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleExportZip}
+                      disabled={isExportingZip}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-[#0071E3] px-3.5 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-[#0077ED] transition disabled:opacity-50"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      <span>{isExportingZip ? "Exporting..." : "Export"}</span>
+                    </button>
                   </div>
                 </div>
 
-                {/* Interactive BAND Shared Collaboration Room */}
-                <BandCollaborationRoom
-                  roomState={bandRoomState}
-                  events={events}
-                  status={status}
-                  isLiveBackend={isLiveBackend}
-                  isSendingMessage={isSendingBandMsg}
-                  isPinningMemory={isPinningMemory}
-                  isApproving={isApprovingHandoff}
-                  isRunningCritic={isRunningCritic}
-                  onSendMessage={handleSendBandMessage}
-                  onPinMemory={handlePinBandMemory}
-                  onPromoteMemory={handlePromoteMemory}
-                  onApproveHandoff={handleApproveHandoff}
-                  onPatchGovernance={handlePatchGovernance}
-                  onRunCritic={handleRunCritic}
-                  onExportAudit={handleExportAudit}
-                />
+                {/* Collapsible BAND Shared Collaboration Room */}
+                <AnimatePresence>
+                  {showAgentRoom && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.25 }}
+                    >
+                      <BandCollaborationRoom
+                        roomState={bandRoomState}
+                        events={events}
+                        status={status}
+                        isLiveBackend={isLiveBackend}
+                        isSendingMessage={isSendingBandMsg}
+                        isPinningMemory={isPinningMemory}
+                        isApproving={isApprovingHandoff}
+                        isRunningCritic={isRunningCritic}
+                        onSendMessage={handleSendBandMessage}
+                        onPinMemory={handlePinBandMemory}
+                        onPromoteMemory={handlePromoteMemory}
+                        onApproveHandoff={handleApproveHandoff}
+                        onPatchGovernance={handlePatchGovernance}
+                        onRunCritic={handleRunCritic}
+                        onExportAudit={handleExportAudit}
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* Side-by-Side Bento Grid for Visual Showcase & Copy Deck */}
                 <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
@@ -879,35 +845,34 @@ export function CampaignWorkspace() {
 
       {/* Needs Detail Directive Modal */}
       {needsDetailDialogOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-lg border-2 border-black bg-white p-6 shadow-[6px_6px_0px_#000000]">
-            <div className="flex items-center justify-between border-b-2 border-black pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl border border-black/[0.08] bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-black/[0.06] pb-3">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-[#F59E0B]" />
-                <h3 className="font-display text-base font-black uppercase text-black">
-                  Request Detail / Re-Prompt Agents
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                <h3 className="text-sm font-semibold text-[#1D1D1F]">
+                  Request Revisions
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setNeedsDetailDialogOpen(false)}
-                className="border border-black p-1 hover:bg-gray-100"
+                className="rounded-lg p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="mt-4 space-y-3 font-mono text-xs">
-              <p className="text-black/80">
-                Provide directive guidance for @visual_pixelate or @copy_pixelate. This will be posted
-                directly into the active BAND room and stamped into the Merkle audit trail.
+            <div className="mt-4 space-y-2 text-xs">
+              <p className="text-neutral-500">
+                Provide directive guidance for the agents to refine visuals or copy.
               </p>
               <textarea
                 rows={4}
                 value={needsDetailFeedback}
                 onChange={(e) => setNeedsDetailFeedback(e.target.value)}
-                placeholder="e.g. @copy_pixelate tighten the headline to 5 words and highlight recycled titanium specs."
-                className="w-full border-2 border-black p-3 font-mono text-xs outline-none shadow-[2px_2px_0px_#000000] focus:bg-[#E6F7EB]"
+                placeholder="e.g. @copy_pixelate make the headline punchier, highlighting sustainable materials."
+                className="w-full rounded-xl border border-black/[0.08] bg-neutral-50/50 p-3 text-xs text-neutral-800 placeholder-neutral-400 outline-none focus:border-neutral-400 focus:bg-white focus:ring-1 focus:ring-neutral-400"
               />
             </div>
 
@@ -915,16 +880,16 @@ export function CampaignWorkspace() {
               <button
                 type="button"
                 onClick={() => setNeedsDetailDialogOpen(false)}
-                className="border-2 border-black bg-white px-4 py-2 font-mono text-xs font-bold uppercase text-black shadow-[2px_2px_0px_#000000]"
+                className="rounded-full border border-neutral-200 px-4 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
               >
-                CANCEL
+                Cancel
               </button>
               <button
                 type="button"
                 onClick={handleDispatchRevisionDirective}
-                className="border-2 border-black bg-[#F59E0B] px-4 py-2 font-mono text-xs font-black uppercase text-black shadow-[3px_3px_0px_#000000] hover:translate-x-[1px] hover:translate-y-[1px]"
+                className="rounded-full bg-neutral-900 px-4 py-2 text-xs font-medium text-white shadow-sm hover:bg-black"
               >
-                DISPATCH DIRECTIVE
+                Send Guidance
               </button>
             </div>
           </div>

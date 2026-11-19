@@ -5,14 +5,14 @@
 @layer base {
   html {
     color-scheme: light;
-    background-color: #E6F7EB;
-    color: #000000;
+    background-color: #FBFBFD;
+    color: #1D1D1F;
   }
 
   body {
-    background-color: #E6F7EB;
-    color: #000000;
-    font-family: 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: #FBFBFD;
+    color: #1D1D1F;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Hanken Grotesk", sans-serif;
     font-feature-settings: "kern" 1, "liga" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -20,57 +20,70 @@
   }
 
   ::selection {
-    background-color: #10B981;
-    color: #000000;
+    background-color: #0071E3;
+    color: #FFFFFF;
   }
 }
 
-/* Brutalist geometric scrollbars */
+/* Apple-style minimalist scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #DCF5E3;
-  border-left: 2px solid #000000;
-  border-top: 2px solid #000000;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #000000;
-  border-radius: 0px;
+  background: rgba(0, 0, 0, 0.16);
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #10B981;
+  background: rgba(0, 0, 0, 0.28);
 }
 
-/* Brutalist utility helper classes */
+/* Minimalist Apple card & button utilities */
+.apple-card {
+  background-color: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 12px -2px rgba(0, 0, 0, 0.04), 0 1px 3px -1px rgba(0, 0, 0, 0.02);
+  border-radius: 1.25rem;
+}
+
+.apple-card-subtle {
+  background-color: #F5F5F7;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  border-radius: 1rem;
+}
+
+/* Backwards-compatibility aliases mapping legacy classes to Apple minimalist styling */
 .brutal-card {
   background-color: #FFFFFF;
-  border: 2px solid #000000;
-  box-shadow: 4px 4px 0px #000000;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+  border-radius: 1.25rem;
 }
 
 .brutal-card-sm {
   background-color: #FFFFFF;
-  border: 2px solid #000000;
-  box-shadow: 2px 2px 0px #000000;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px -1px rgba(0, 0, 0, 0.04);
+  border-radius: 0.875rem;
 }
 
 .brutal-button {
-  border: 2px solid #000000;
-  box-shadow: 3px 3px 0px #000000;
-  transition: all 0.1s ease-in-out;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 9999px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .brutal-button:hover {
-  transform: translate(-1px, -1px);
-  box-shadow: 4px 4px 0px #000000;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.08);
 }
 
 .brutal-button:active {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0px #000000;
+  transform: translateY(0px);
 }
