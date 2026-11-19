@@ -380,3 +380,169 @@ export function getProductVisualOptions(
     composition: opt.composition,
   }));
 }
+
+export interface PosterMetadata {
+  headlines: string[];
+  badge: string;
+  tagline: string;
+  features: string[];
+  ctaText: string;
+}
+
+const POSTER_METADATA_BY_CATEGORY: Record<string, Omit<PosterMetadata, "headlines"> & { headlines: string[] }> = {
+  hydration_bottle: {
+    headlines: [
+      "PURE HYDRATION. ZERO PLASTIC.",
+      "THE NEXT ERA OF CLEAN WATER.",
+      "LIGHT THAT PURIFIES EVERY SIP.",
+    ],
+    badge: "OFFICIAL LAUNCH // VOL. 01",
+    tagline: "Self-cleaning UV-C smart insulated titanium flask. 24-hour thermal cold lock.",
+    features: [
+      "100% RECYCLED TITANIUM",
+      "UV-C 99.9% SANITIZATION",
+      "24-HOUR COLD LOCK",
+      "AMBIENT LED GLOW RING",
+    ],
+    ctaText: "PRE-ORDER NOW →",
+  },
+  audio_earbuds: {
+    headlines: [
+      "SILENCE THE CITY. HEAR GENIUS.",
+      "NEURAL ACOUSTICS IN MOTION.",
+      "42 HOURS OF DEEP FLOW STATE.",
+    ],
+    badge: "NEURAL ISOLATION // PRO SERIES",
+    tagline: "Ultra-low-latency AI earbuds powered by real-time neural acoustic isolation.",
+    features: [
+      "ACTIVE NEURAL NOISE CANCEL",
+      "SPATIAL STUDIO MASTERING",
+      "42-HOUR BATTERY ENDURANCE",
+      "IPX8 WATERPROOF SEAL",
+    ],
+    ctaText: "DISCOVER SOUND →",
+  },
+  matcha_tea: {
+    headlines: [
+      "STONE-MILLED IN UJI. POURED FRESH.",
+      "CALM FOCUS WITHOUT THE CRASH.",
+      "FIRST HARVEST RITUAL, DELIVERED.",
+    ],
+    badge: "SINGLE CULTIVAR // FIRST HARVEST",
+    tagline: "First-harvest ceremonial matcha stone-milled to order and nitrogen sealed.",
+    features: [
+      "FIRST HARVEST SINGLE-CULTIVAR",
+      "STONE-MILLED IN KYOTO",
+      "JITTER-FREE L-THEANINE",
+      "NITROGEN SEALED FRESH",
+    ],
+    ctaText: "JOIN THE RITUAL →",
+  },
+  wearable_tech: {
+    headlines: [
+      "PRECISION BIOMETRICS ON DEMAND.",
+      "OPTIMIZED FOR PEAK RECOVERY.",
+      "THE FUTURE OF BODY INTELLIGENCE.",
+    ],
+    badge: "TITANIUM SERIES // BIOMETRIC HUD",
+    tagline: "Next-generation biometric sensor array crafted in aerospace titanium.",
+    features: [
+      "CONTINUOUS VO2 MAX TRACKING",
+      "TITANIUM UNIBODY CHASSIS",
+      "7-DAY EXTENDED BATTERY",
+      "SAPPHIRE CRYSTAL OLED",
+    ],
+    ctaText: "EXPLORE WEARABLE →",
+  },
+  skincare_beauty: {
+    headlines: [
+      "RADIANCE RESTORED AT THE CELLULAR LEVEL.",
+      "DEEP HYDRATION. PURE CLINICAL FORMULA.",
+      "THE GOLD STANDARD IN HEALTHY SKIN.",
+    ],
+    badge: "CLINICAL GRADE // BOTANICAL ACTIVES",
+    tagline: "Multi-weight bio-identical peptide complex for profound 24-hour hydration.",
+    features: [
+      "TRIPLE PEPTIDE COMPLEX",
+      "CLINICALLY PROVEN 24H HYDRATION",
+      "DERMATOLOGIST FORMULATED",
+      "ZERO ARTIFICIAL FRAGRANCE",
+    ],
+    ctaText: "SHOP THE DROP →",
+  },
+  coffee_beverage: {
+    headlines: [
+      "SMALL-BATCH ROAST. UNCOMPROMISED ORIGIN.",
+      "POUR PERFECTION EVERY MORNING.",
+      "ROASTED TO ORDER IN 24 HOURS.",
+    ],
+    badge: "MICRO-LOT // SINGLE ORIGIN",
+    tagline: "Single-origin micro-lot beans stone-roasted to order for extraordinary flavor.",
+    features: [
+      "SINGLE ORIGIN MICRO-LOT",
+      "SLOW-CRAFT DRUM ROASTED",
+      "NATURAL FLORAL & CITRUS NOTES",
+      "100% DIRECT TRADE SOURCING",
+    ],
+    ctaText: "TASTE THE DROP →",
+  },
+  footwear_apparel: {
+    headlines: [
+      "GRAVITY DEFIED. UNSTOPPABLE STRIDE.",
+      "ENGINEERED FOR THE CITY RUNNER.",
+      "HIGH-PERFORMANCE STREET SILHOUETTE.",
+    ],
+    badge: "ARCHIVE DROP // SS-26",
+    tagline: "Dual-density supercritical foam paired with carbon propulsion plate.",
+    features: [
+      "CARBON PROPULSION PLATE",
+      "SEAMLESS ENGINEERED KNIT",
+      "ENERGY-RETURN DUAL FOAM",
+      "ALL-WEATHER TRACTION",
+    ],
+    ctaText: "CLAIM YOUR PAIR →",
+  },
+  tech_hardware: {
+    headlines: [
+      "TACTILE MASTERY IN EVERY STROKE.",
+      "DESIGNED FOR PURE FLOW AND FOCUS.",
+      "CNC ALUMINUM. ZERO LATENCY.",
+    ],
+    badge: "CUSTOM ARCHIVE // EDITION 01",
+    tagline: "Gasket-mounted solid aluminum mechanical keyboard with sub-1ms response.",
+    features: [
+      "CNC MACHINED SOLID CHASSIS",
+      "HOT-SWAPPABLE SWITCHES",
+      "SUB-1MS WIRELESS PROTOCOL",
+      "CUSTOM PBT DYE-SUB KEYCAPS",
+    ],
+    ctaText: "BUILD YOUR RIG →",
+  },
+};
+
+export function getPosterMetadataForBrief(brief: CampaignBrief): PosterMetadata {
+  const category = detectProductCategory(brief);
+  const found = POSTER_METADATA_BY_CATEGORY[category];
+  const prod = brief.productName.trim() || "Product";
+
+  if (found) {
+    return found;
+  }
+
+  return {
+    headlines: [
+      `${prod.toUpperCase()} REIMAGINED.`,
+      `CRAFTED FOR ${brief.brandTone.toUpperCase()} IMPACT.`,
+      "BUILT TO STAND OUT EVERYWHERE.",
+    ],
+    badge: `LIMITED EDITION // ${brief.brandTone.toUpperCase()}`,
+    tagline: brief.productDescription.slice(0, 80) + (brief.productDescription.length > 80 ? "..." : ""),
+    features: [
+      "COMMERCIAL CRAFTSMANSHIP",
+      "INNOVATIVE ENGINEERING",
+      "SUSTAINABLE LIFETIME DURABILITY",
+      "EXCLUSIVE LAUNCH ALLOCATION",
+    ],
+    ctaText: "PRE-ORDER NOW →",
+  };
+}

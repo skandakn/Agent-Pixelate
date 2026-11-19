@@ -24,6 +24,8 @@ import {
   VisualCreative,
 } from "@/types/campaign";
 import { buildSimulatedCampaignAssets } from "@/data/presets";
+import { getPosterMetadataForBrief, getProductVisualOptions } from "@/lib/productImagery";
+import { PosterTheme } from "@/types/campaign";
 
 function resolveBackendEndpoints(): { apiBase: string; wsBase: string } {
   const envApi = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "");
@@ -308,6 +310,12 @@ function adaptBackendCampaignToAssets(
             platform,
             imageUrl: resolvedUrl,
             options: (asset as { options?: VisualCreative["options"] }).options || fallbackCreative?.options,
+            headline: (asset as { headline?: string }).headline || fallbackCreative?.headline,
+            tagline: (asset as { tagline?: string }).tagline || fallbackCreative?.tagline,
+            badge: (asset as { badge?: string }).badge || fallbackCreative?.badge,
+            ctaText: (asset as { ctaText?: string }).ctaText || fallbackCreative?.ctaText,
+            features: (asset as { features?: string[] }).features || fallbackCreative?.features,
+            posterTheme: (asset as { posterTheme?: VisualCreative["posterTheme"] }).posterTheme || fallbackCreative?.posterTheme || "billboard",
             lighting:
               fallbackCreative?.lighting ??
               "Studio dual-axis rim lighting",
@@ -785,6 +793,7 @@ export function launchCampaignSession(
       activeSocket = ws;
 
       const seenEventIds = new Set<string>();
+      const streamedCreatives: VisualCreative[] = [];
       let wsConnected = false;
 
       // Fast background poll so UI hydrates immediately even if proxy buffers WS
@@ -852,8 +861,52 @@ export function launchCampaignSession(
             ),
           });
 
-          if (
-            eventTypeRaw === "asset_generated" ||
+          if (eventTypeRaw === "asset_generated") {
+            const payload = (parsed.payload || {}) as Record<string, unknown>;
+            const rawAsset = (payload.asset || parsed.asset) as BackendVisualAsset | undefined;
+            if (rawAsset && rawAsset.asset_url) {
+              const resolvedUrl = rawAsset.asset_url.startsWith("http")
+                ? rawAsset.asset_url
+                : `${apiBase}${rawAsset.asset_url.startsWith("/") ? "" : "/"}${rawAsset.asset_url}`;
+              const platform = formatPlatformLabel(rawAsset.platform || "Instagram");
+              const posterMeta = getPosterMetadataForBrief(brief);
+              const idx = streamedCreatives.length;
+              const themes: PosterTheme[] = ["billboard", "swiss", "luxury", "cyber"];
+
+              const newCreative: VisualCreative = {
+                id: rawAsset.asset_id || `${campaignId}-vis-${idx + 1}`,
+                title: rawAsset.title || `${brief.productName} — Launch Key Visual`,
+                subtitle: `${platform} Concept · Commercial Ad Poster`,
+                format: `${rawAsset.aspect_ratio || "4:5"} Commercial Poster`,
+                aspectRatio: normalizeAspect(rawAsset.aspect_ratio),
+                platform,
+                imageUrl: resolvedUrl,
+                options: getProductVisualOptions(brief, campaignId),
+                headline: posterMeta.headlines[idx % posterMeta.headlines.length],
+                tagline: posterMeta.tagline,
+                badge: posterMeta.badge,
+                ctaText: posterMeta.ctaText,
+                features: posterMeta.features,
+                posterTheme: themes[idx % themes.length],
+                lighting: "Studio dual-axis commercial rim lighting",
+                composition: "Commercial advertising poster hierarchy with kicker badge & feature pills",
+                artNote: rawAsset.prompt_used || "Commercial advertising poster layout with dynamic typography",
+                promptSummary: rawAsset.prompt_used || `${brief.brandTone} commercial poster for ${brief.productName}`,
+              };
+
+              const existingIdx = streamedCreatives.findIndex((c) => c.id === newCreative.id);
+              if (existingIdx >= 0) {
+                streamedCreatives[existingIdx] = newCreative;
+              } else {
+                streamedCreatives.push(newCreative);
+              }
+
+              callbacks.onPartialAssets({
+                creatives: [...streamedCreatives],
+              });
+            }
+            void hydrateFromBackend(campaignId, false);
+          } else if (
             eventTypeRaw === "visual_completed" ||
             eventTypeRaw === "copy_completed"
           ) {

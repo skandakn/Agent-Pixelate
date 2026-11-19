@@ -1422,6 +1422,76 @@ class CampaignCoordinator:
             logger.warning("Gemini image generation failed (%s); using studio photo.", exc)
         return None
 
+    def _get_product_photo_url(
+        self, product_name: str, product_description: str, idx: int
+    ) -> str:
+        """Resolve a direct CDN URL for commercial product photography."""
+        haystack = f"{product_name} {product_description}".lower()
+        if any(k in haystack for k in ("bottle", "hydro", "water", "flask", "tumbler", "drinkware", "hydration")):
+            urls = [
+                "https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1523362628745-0c100150b504?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1589365278144-c9e705f843ba?auto=format&fit=crop&w=1200&q=80",
+            ]
+        elif any(k in haystack for k in ("earbud", "audio", "noise", "headphone", "sound", "acoustic", "pod", "aether")):
+            urls = [
+                "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1572536147248-ac59a8abfa4b?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1546435770-a3e426bf472b?auto=format&fit=crop&w=1200&q=80",
+            ]
+        elif any(k in haystack for k in ("matcha", "tea", "kyoto", "ceremonial", "kuroha", "whisk", "chasen")):
+            urls = [
+                "https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1515823662273-ad9525e58846?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1582793988951-9aed5509eb97?auto=format&fit=crop&w=1200&q=80",
+            ]
+        elif any(k in haystack for k in ("watch", "ring", "wearable", "biometric", "tracker", "smartwatch")):
+            urls = [
+                "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1546868871-7041f2a55e12?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1510519138197-06b8628cbf47?auto=format&fit=crop&w=1200&q=80",
+            ]
+        elif any(k in haystack for k in ("serum", "cream", "skin", "cosmetic", "perfume", "beauty", "fragrance")):
+            urls = [
+                "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1571781926291-c477ebfd024b?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?auto=format&fit=crop&w=1200&q=80",
+            ]
+        elif any(k in haystack for k in ("coffee", "espresso", "roast", "beans", "brew", "cafe")):
+            urls = [
+                "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1517256064527-09c73fc73e38?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&q=80",
+            ]
+        elif any(k in haystack for k in ("shoe", "sneaker", "footwear", "apparel", "jacket", "hoodie")):
+            urls = [
+                "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1552346154-21d32810aba3?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1607522370275-f14206abe5d3?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1515955656352-a1fa3ffcd111?auto=format&fit=crop&w=1200&q=80",
+            ]
+        elif any(k in haystack for k in ("keyboard", "mouse", "laptop", "computer", "desk", "monitor")):
+            urls = [
+                "https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1595225476474-87563907a212?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1526738549149-8e07eca6c147?auto=format&fit=crop&w=1200&q=80",
+            ]
+        else:
+            urls = [
+                "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1510519138197-06b8628cbf47?auto=format&fit=crop&w=1200&q=80",
+            ]
+        return urls[idx % len(urls)]
+
     async def _get_product_photo_bytes(
         self, product_name: str, product_description: str, idx: int
     ) -> tuple[bytes, str] | None:
@@ -1592,23 +1662,13 @@ class CampaignCoordinator:
                 saved_path = await self.store.write_asset_bytes(
                     campaign.campaign_id, filename, img_bytes
                 )
+                asset_url = f"/api/campaigns/{campaign.campaign_id}/assets/{filename}"
+                file_path_val = str(saved_path)
             else:
-                filename = f"{asset_id}_{platform}.svg"
-                mime_type = "image/svg+xml"
-                svg_content = self._render_concept_svg(
-                    brand_name=req.brand_name,
-                    concept_title=angle_title,
-                    platform=platform,
-                    tone=req.brand_tone,
-                    primary=primary,
-                    accent=accent,
-                    highlight=highlight,
-                    width=width,
-                    height=height,
-                )
-                saved_path = await self.store.write_asset_bytes(
-                    campaign.campaign_id, filename, svg_content.encode("utf-8")
-                )
+                # Direct curated high-resolution commercial product photo CDN URL (instant 0ms response)
+                asset_url = self._get_product_photo_url(req.brand_name, req.product_description, idx)
+                mime_type = "image/jpeg"
+                file_path_val = None
 
             asset = VisualAsset(
                 asset_id=asset_id,
@@ -1616,8 +1676,8 @@ class CampaignCoordinator:
                 platform=platform,
                 aspect_ratio=aspect,
                 prompt_used=prompt_used,
-                file_path=str(saved_path),
-                asset_url=f"/api/campaigns/{campaign.campaign_id}/assets/{filename}",
+                file_path=file_path_val,
+                asset_url=asset_url,
                 mime_type=mime_type,
                 width=width,
                 height=height,
