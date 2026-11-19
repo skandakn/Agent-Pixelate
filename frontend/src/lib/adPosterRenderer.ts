@@ -1,5 +1,69 @@
 export type PosterTheme = "billboard" | "swiss" | "luxury" | "cyber";
 
+export interface PosterThemeDetails {
+  id: PosterTheme;
+  label: string;
+  accentColor: string;
+  frameColor: string;
+  kickerBg: string;
+  kickerText: string;
+  ctaBg: string;
+  ctaText: string;
+  fontFamilyDisplay: string;
+  fontFamilyMono: string;
+}
+
+export const POSTER_THEME_CONFIGS: Record<PosterTheme, PosterThemeDetails> = {
+  billboard: {
+    id: "billboard",
+    label: "Street Billboard",
+    accentColor: "#00E599",
+    frameColor: "#00E599",
+    kickerBg: "#00E599",
+    kickerText: "#000000",
+    ctaBg: "#00E599",
+    ctaText: "#000000",
+    fontFamilyDisplay: "Archivo, Impact, sans-serif",
+    fontFamilyMono: "'JetBrains Mono', monospace",
+  },
+  swiss: {
+    id: "swiss",
+    label: "Swiss Grid",
+    accentColor: "#FFFFFF",
+    frameColor: "rgba(255, 255, 255, 0.4)",
+    kickerBg: "#FFFFFF",
+    kickerText: "#000000",
+    ctaBg: "#FFFFFF",
+    ctaText: "#000000",
+    fontFamilyDisplay: "'Hanken Grotesk', Helvetica, sans-serif",
+    fontFamilyMono: "'JetBrains Mono', monospace",
+  },
+  luxury: {
+    id: "luxury",
+    label: "Luxury Editorial",
+    accentColor: "#D4AF37",
+    frameColor: "rgba(212, 175, 55, 0.8)",
+    kickerBg: "#D4AF37",
+    kickerText: "#000000",
+    ctaBg: "#D4AF37",
+    ctaText: "#000000",
+    fontFamilyDisplay: "Georgia, serif",
+    fontFamilyMono: "'JetBrains Mono', monospace",
+  },
+  cyber: {
+    id: "cyber",
+    label: "Cyber Tech HUD",
+    accentColor: "#06B6D4",
+    frameColor: "rgba(6, 182, 212, 0.8)",
+    kickerBg: "#06B6D4",
+    kickerText: "#000000",
+    ctaBg: "#06B6D4",
+    ctaText: "#000000",
+    fontFamilyDisplay: "'Plus Jakarta Sans', sans-serif",
+    fontFamilyMono: "'JetBrains Mono', monospace",
+  },
+};
+
 export interface AdPosterConfig {
   productName: string;
   headline: string;
@@ -14,7 +78,7 @@ export interface AdPosterConfig {
   brandTone?: string;
 }
 
-function getDimensions(aspectRatio: "4:5" | "1:1" | "9:16" | "16:9"): { width: number; height: number } {
+export function getDimensions(aspectRatio: "4:5" | "1:1" | "9:16" | "16:9"): { width: number; height: number } {
   switch (aspectRatio) {
     case "4:5":
       return { width: 1200, height: 1500 };
