@@ -9,33 +9,40 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        apple: {
-          bg: "#F5F5F7",
-          surface: "#FFFFFF",
-          subtle: "#FBFBFD",
-          ink: "#1D1D1F",
-          secondary: "#6E6E73",
-          tertiary: "#86868B",
-          border: "#D2D2D7",
-          blue: "#0071E3",
-          "blue-hover": "#0077ED",
-          link: "#0066CC",
-          green: "#248A3D",
+        approva: {
+          canvas: "#E6F7EB",
+          "canvas-tint": "#DCF5E3",
+          card: "#FFFFFF",
+          black: "#000000",
+          mint: "#10B981",
+          "mint-light": "#D1FAE5",
+          amber: "#F59E0B",
+          "amber-light": "#FEF3C7",
+          red: "#EF4444",
+          "red-light": "#FEE2E2",
+          purple: "#8B5CF6",
+          "purple-light": "#EDE9FE",
+          blue: "#2563EB",
+          "blue-light": "#DBEAFE",
+          gray: "#64748B",
+          "gray-light": "#F1F5F9",
         },
       },
       fontFamily: {
-        sans: [
+        display: [
+          "'Archivo'",
           "-apple-system",
           "BlinkMacSystemFont",
-          "'SF Pro Display'",
-          "'SF Pro Text'",
+          "sans-serif",
+        ],
+        sans: [
+          "'Hanken Grotesk'",
           "'Plus Jakarta Sans'",
-          "'Helvetica Neue'",
-          "Arial",
+          "-apple-system",
+          "BlinkMacSystemFont",
           "sans-serif",
         ],
         mono: [
-          "'SF Mono'",
           "'JetBrains Mono'",
           "ui-monospace",
           "SFMono-Regular",
@@ -44,14 +51,14 @@ const config: Config = {
         ],
       },
       boxShadow: {
-        apple:
-          "0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px -12px rgba(0, 0, 0, 0.08)",
-        "apple-hover":
-          "0 4px 12px rgba(0, 0, 0, 0.05), 0 18px 36px -16px rgba(0, 0, 0, 0.12)",
-        "apple-pill": "0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 1px rgba(0, 0, 0, 0.04)",
+        brutal: "4px 4px 0px #000000",
+        "brutal-sm": "2px 2px 0px #000000",
+        "brutal-lg": "6px 6px 0px #000000",
+        "brutal-xl": "8px 8px 0px #000000",
+        "brutal-active": "1px 1px 0px #000000",
       },
-      borderRadius: {
-        "apple-card": "20px",
+      borderWidth: {
+        "3": "3px",
       },
       animation: {
         "pulse-slow": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",

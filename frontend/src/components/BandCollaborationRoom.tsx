@@ -170,52 +170,49 @@ export function BandCollaborationRoom({
   );
 
   return (
-    <section className="overflow-hidden rounded-[22px] border border-black/[0.06] bg-white shadow-apple">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] px-6 py-4">
+    <section className="overflow-hidden border-2 border-black bg-white shadow-[4px_4px_0px_#000000]">
+      {/* Approva Brutalist Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-black bg-[#E6F7EB] px-5 py-3.5">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1D1D1F] text-white">
+          <div className="flex h-8 w-8 items-center justify-center border-2 border-black bg-white shadow-[2px_2px_0px_#000000]">
             <MessageSquare className="h-4 w-4" />
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-[15px] font-semibold tracking-[-0.015em] text-[#1D1D1F]">
-                BAND Shared Room &amp; Control Plane
+              <h3 className="font-display text-sm font-black uppercase tracking-tight text-black">
+                BAND SHARED ROOM &amp; AGENTIC CONTROL PLANE
               </h3>
-              <span className="rounded-full bg-[#0071E3]/[0.1] px-2.5 py-0.5 font-mono text-[10px] font-semibold text-[#0066CC]">
-                band.ai
-              </span>
-              <span className="hidden rounded-full bg-[#F5F5F7] px-2.5 py-0.5 font-mono text-[10px] text-[#6E6E73] sm:inline-block">
+              <span className="border border-black bg-white px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-black">
                 {roomState.roomId}
               </span>
               {roomState.criticReport && (
-                <span className="rounded-full bg-[#248A3D]/10 px-2.5 py-0.5 text-[10px] font-semibold text-[#1D6F31]">
+                <span className="border border-black bg-[#10B981] px-2 py-0.5 font-mono text-[10px] font-black uppercase text-black">
                   QA {roomState.criticReport.overallScore}/100 ({roomState.criticReport.grade})
                 </span>
               )}
             </div>
-            <p className="text-[12px] text-[#6E6E73]">
-              Heterogeneous Agentic Mesh — Per-Agent Focus, Cross-Session Memory, Loop Guard &amp; Brand QA Critic.
+            <p className="font-mono text-xs text-black/70">
+              Heterogeneous Multi-Agent Mesh — Focus Windows, Merkle Audit Chain &amp; LoopGuard Critic.
             </p>
           </div>
         </div>
 
-        {/* 4-Tab Classic Apple Segmented Switcher */}
-        <div className="flex flex-wrap rounded-full bg-[#F5F5F7] p-1">
+        {/* 4-Tab Brutalist Switcher */}
+        <div className="flex flex-wrap gap-1.5">
           {(
             [
-              { id: "chat", label: `Room (${visibleMessages.length})`, icon: MessageSquare },
+              { id: "chat", label: `ROOM (${visibleMessages.length})`, icon: MessageSquare },
               {
                 id: "memory",
-                label: `Memory (${roomState.memories.length + roomState.brandMemories.length})`,
+                label: `MEMORY (${roomState.memories.length + roomState.brandMemories.length})`,
                 icon: Database,
               },
               {
                 id: "executions",
-                label: `Focus & Runs (${roomState.executions.length})`,
+                label: `FOCUS (${roomState.executions.length})`,
                 icon: Cpu,
               },
-              { id: "control", label: "Control Plane", icon: Shield },
+              { id: "control", label: "CONTROL", icon: Shield },
             ] as const
           ).map((tab) => {
             const Icon = tab.icon;
@@ -226,10 +223,10 @@ export function BandCollaborationRoom({
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium transition",
+                  "inline-flex items-center gap-1.5 border-2 border-black px-3 py-1 font-mono text-xs font-bold uppercase transition-all",
                   active
-                    ? "bg-white text-[#1D1D1F] shadow-apple-pill"
-                    : "text-[#6E6E73] hover:text-[#1D1D1F]"
+                    ? "bg-[#10B981] text-black shadow-[2px_2px_0px_#000000]"
+                    : "bg-white text-black hover:bg-gray-100"
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />
