@@ -476,6 +476,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return FileResponse(
             path=asset_path,
             media_type=media_type or "application/octet-stream",
+            content_disposition_type="inline",
             filename=asset_path.name,
         )
 

@@ -19,6 +19,8 @@ build/
 # Local runtime campaign data
 data/
 /data/
+test_data/
+/test_data/
 
 # Node / Next.js
 node_modules/

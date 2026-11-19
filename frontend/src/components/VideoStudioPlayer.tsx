@@ -171,6 +171,7 @@ export function VideoStudioPlayer({
   const [aspectRatio, setAspectRatio] = useState<VideoAspectRatio>("16:9");
   const [shotStyle, setShotStyle] = useState<VideoShotStyle>("obsidian_cinema");
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
+  const activeVideo = videos[activeVideoIndex] ?? videos[0];
   const [isPlayingCanvas, setIsPlayingCanvas] = useState(true);
   const [isRecordingWebm, setIsRecordingWebm] = useState(false);
 
@@ -416,85 +417,52 @@ export function VideoStudioPlayer({
     };
   }, [drawFrame, isPlayingCanvas]);
 
-  const activeVideo = videos[activeVideoIndex] ?? videos[0];
-
-  const handleRecordClientWebm = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    setIsRecordingWebm(true);
-    try {
-      const stream = canvas.captureStream(30);
-      const recorder = new MediaRecorder(stream, { mimeType: "video/webm" });
-      const chunks: Blob[] = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.push(e.data);
-      };
-
-      recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: "video/webm" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${slugify(brief.productName)}-kinetic.webm`;
-        a.click();
-        URL.revokeObjectURL(url);
-        setIsRecordingWebm(false);
-      };
-
-      recorder.start();
-      setTimeout(() => {
-        if (recorder.state !== "inactive") recorder.stop();
-      }, 5000);
-    } catch {
-      setIsRecordingWebm(false);
-    }
-  };
-
   return (
     <div className="space-y-4 font-sans">
       {/* Recipe & Aspect Director Box */}
-      <div className="space-y-3 border-2 border-black bg-[#E6F7EB]/40 p-4 shadow-[2px_2px_0px_#000000]">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-black pb-2.5">
-          <div className="flex items-center gap-2">
-            <Wand2 className="h-4 w-4" />
-            <span className="font-display text-xs font-black uppercase text-black">
-              DIRECTOR RECIPES &amp; MOTION KINETICS
-            </span>
+      <div className="space-y-4 rounded-2xl border border-black/[0.08] bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] pb-3">
+          <div>
+            <h3 className="text-sm font-semibold text-[#1D1D1F]">
+              Video Studio &amp; Motion Kinetics
+            </h3>
+            <p className="mt-0.5 text-xs text-neutral-500">
+              Autonomous cinematic direction, Ken Burns framing &amp; AI voiceover
+            </p>
           </div>
 
           {/* Aspect Switcher */}
-          <div className="flex gap-1">
+          <div className="inline-flex rounded-full bg-neutral-100 p-0.5">
             <button
               type="button"
               onClick={() => setAspectRatio("16:9")}
               className={cn(
-                "inline-flex items-center gap-1 border-2 border-black px-2.5 py-0.5 font-mono text-[11px] font-bold uppercase transition-all",
+                "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition",
                 aspectRatio === "16:9"
-                  ? "bg-black text-white shadow-[1px_1px_0px_#000000]"
-                  : "bg-white text-black hover:bg-gray-100"
+                  ? "bg-white text-neutral-900 shadow-sm"
+                  : "text-neutral-500 hover:text-neutral-900"
               )}
             >
-              <Monitor className="h-3 w-3" />
-              <span>16:9 CINEMA</span>
+              <Monitor className="h-3.5 w-3.5" />
+              <span>16:9 Cinema</span>
             </button>
             <button
               type="button"
               onClick={() => setAspectRatio("9:16")}
               className={cn(
-                "inline-flex items-center gap-1 border-2 border-black px-2.5 py-0.5 font-mono text-[11px] font-bold uppercase transition-all",
+                "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition",
                 aspectRatio === "9:16"
-                  ? "bg-black text-white shadow-[1px_1px_0px_#000000]"
-                  : "bg-white text-black hover:bg-gray-100"
+                  ? "bg-white text-neutral-900 shadow-sm"
+                  : "text-neutral-500 hover:text-neutral-900"
               )}
             >
-              <Smartphone className="h-3 w-3" />
-              <span>9:16 REELS</span>
+              <Smartphone className="h-3.5 w-3.5" />
+              <span>9:16 Reel</span>
             </button>
           </div>
         </div>
 
-        {/* 6 Recipes */}
+        {/* Shot Recipes Grid */}
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {SHOT_RECIPES.map((recipe) => {
             const active = shotStyle === recipe.id;
@@ -504,21 +472,33 @@ export function VideoStudioPlayer({
                 type="button"
                 onClick={() => setShotStyle(recipe.id)}
                 className={cn(
-                  "border-2 border-black p-2 text-left transition-all",
+                  "rounded-xl border p-2.5 text-left transition",
                   active
-                    ? "bg-[#10B981] text-black shadow-[2px_2px_0px_#000000]"
-                    : "bg-white text-black hover:bg-gray-50"
+                    ? "border-neutral-900 bg-neutral-900 text-white shadow-sm"
+                    : "border-black/[0.06] bg-[#FBFBFD] text-neutral-700 hover:bg-neutral-100/70"
                 )}
               >
                 <div className="flex items-center justify-between gap-1">
-                  <span className="truncate font-display text-xs font-black uppercase">
+                  <span className="truncate text-xs font-semibold">
                     {recipe.label}
                   </span>
-                  <span className="shrink-0 border border-black bg-black px-1 font-mono text-[9px] text-white">
+                  <span
+                    className={cn(
+                      "shrink-0 rounded px-1.5 py-0.5 text-[9px] font-medium",
+                      active
+                        ? "bg-white/20 text-white"
+                        : "bg-neutral-200/60 text-neutral-600"
+                    )}
+                  >
                     {recipe.tag}
                   </span>
                 </div>
-                <div className="mt-0.5 truncate font-mono text-[10px] text-black/70">
+                <div
+                  className={cn(
+                    "mt-0.5 truncate text-[10px]",
+                    active ? "text-neutral-300" : "text-neutral-500"
+                  )}
+                >
                   {recipe.curve}
                 </div>
               </button>
@@ -527,47 +507,45 @@ export function VideoStudioPlayer({
         </div>
 
         {/* AI Voiceover & Soundstage Console */}
-        <div className="space-y-3 border-2 border-black bg-white p-3.5 shadow-[2px_2px_0px_#000000]">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center border border-black bg-[#10B981] text-black">
-                <Mic className="h-4 w-4" />
+        <div className="rounded-xl border border-black/[0.06] bg-[#FBFBFD] p-3.5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-neutral-900 text-white shadow-sm">
+                <Mic className="h-3.5 w-3.5" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-display text-xs font-black uppercase text-black">
+                  <span className="text-xs font-semibold text-[#1D1D1F]">
                     AI Voiceover &amp; Soundstage
                   </span>
-                  <span className="border border-black bg-[#10B981] px-1 font-mono text-[9px] font-bold text-black">
-                    Sidechain Ducking (-12dB)
+                  <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[9px] font-medium text-emerald-700">
+                    Studio Mixed
                   </span>
                 </div>
-                <p className="font-mono text-[10px] text-black/70">
-                  24fps synchronized vocal narration mixed over cinematic pads
+                <p className="text-[11px] text-neutral-500">
+                  Synchronized vocal narration mixed over cinematic audio score
                 </p>
               </div>
             </div>
 
             {/* Toggle Switch */}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setEnableVoiceover((v) => !v)}
+            <button
+              type="button"
+              onClick={() => setEnableVoiceover((v) => !v)}
+              className={cn(
+                "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200",
+                enableVoiceover ? "bg-[#0071E3]" : "bg-neutral-300"
+              )}
+              role="switch"
+              aria-checked={enableVoiceover}
+            >
+              <span
                 className={cn(
-                  "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-black transition-colors duration-200 ease-in-out focus:outline-none",
-                  enableVoiceover ? "bg-[#10B981]" : "bg-black/20"
+                  "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200",
+                  enableVoiceover ? "translate-x-4" : "translate-x-0.5"
                 )}
-                role="switch"
-                aria-checked={enableVoiceover}
-              >
-                <span
-                  className={cn(
-                    "pointer-events-none inline-block h-4 w-4 transform rounded-full border border-black bg-white shadow-md ring-0 transition duration-200 ease-in-out",
-                    enableVoiceover ? "translate-x-5" : "translate-x-0.5"
-                  )}
-                />
-              </button>
-            </div>
+              />
+            </button>
           </div>
 
           {enableVoiceover && (
@@ -582,33 +560,37 @@ export function VideoStudioPlayer({
                       type="button"
                       onClick={() => setSelectedVoice(vp.id)}
                       className={cn(
-                        "border-2 p-2 text-left transition",
+                        "rounded-xl border p-2 text-left transition",
                         active
-                          ? "border-black bg-[#10B981] text-black shadow-[2px_2px_0px_#000000]"
-                          : "border-black bg-white text-black/80 hover:bg-[#F5F5F7]"
+                          ? "border-neutral-900 bg-white text-neutral-900 shadow-sm ring-1 ring-neutral-900"
+                          : "border-black/[0.06] bg-white text-neutral-700 hover:bg-neutral-50"
                       )}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-display text-xs font-black uppercase">{vp.label}</span>
-                        <span className="font-mono text-[9px] font-bold text-black/70">{vp.tag}</span>
+                        <span className="text-xs font-semibold">{vp.label}</span>
+                        <span className="text-[9px] font-medium text-neutral-400">
+                          {vp.tag}
+                        </span>
                       </div>
-                      <p className="mt-0.5 line-clamp-1 font-mono text-[9px] text-black/60">{vp.desc}</p>
+                      <p className="mt-0.5 line-clamp-1 text-[10px] text-neutral-500">
+                        {vp.desc}
+                      </p>
                     </button>
                   );
                 })}
               </div>
 
               {/* Audition & Script Edit Actions */}
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/10 pt-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/[0.04] pt-2">
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={handleAuditionVoiceover}
                     className={cn(
-                      "inline-flex items-center gap-1.5 border-2 border-black px-3 py-1 font-mono text-[11px] font-bold uppercase transition",
+                      "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition",
                       isAuditioning
-                        ? "bg-[#D70015] text-white shadow-[2px_2px_0px_#000000]"
-                        : "bg-white text-black shadow-[2px_2px_0px_#000000] hover:bg-[#F5F5F7]"
+                        ? "bg-rose-50 text-rose-700 border border-rose-200"
+                        : "border border-black/[0.08] bg-white text-neutral-700 hover:bg-neutral-50"
                     )}
                   >
                     {isAuditioning ? (
@@ -619,7 +601,7 @@ export function VideoStudioPlayer({
                     ) : (
                       <>
                         <Volume2 className="h-3 w-3" />
-                        <span>Audition Voiceover</span>
+                        <span>Audition Voice</span>
                       </>
                     )}
                   </button>
@@ -627,50 +609,41 @@ export function VideoStudioPlayer({
                   <button
                     type="button"
                     onClick={() => setShowScriptDrawer((s) => !s)}
-                    className="inline-flex items-center gap-1 border-2 border-black bg-white px-2.5 py-1 font-mono text-[11px] font-bold uppercase text-black shadow-[2px_2px_0px_#000000] hover:bg-[#F5F5F7]"
+                    className="inline-flex items-center gap-1 rounded-full border border-black/[0.08] bg-white px-3 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
                   >
-                    <FileText className="h-3 w-3 text-black" />
-                    <span>{showScriptDrawer ? "Hide Script" : "Edit Narration"}</span>
+                    <FileText className="h-3 w-3" />
+                    <span>{showScriptDrawer ? "Hide Script" : "Edit Script"}</span>
                   </button>
                 </div>
 
-                <span className="font-mono text-[10px] text-black/70">
+                <span className="text-[11px] text-neutral-400">
                   4-Beat Directors&apos; Cadence
                 </span>
               </div>
 
               {/* Script Drawer */}
               {showScriptDrawer && (
-                <div className="space-y-2 border border-black bg-[#F5F5F7] p-2.5 text-[11px]">
+                <div className="space-y-2 rounded-xl border border-black/[0.06] bg-white p-3 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="font-mono font-bold uppercase text-black">
+                    <span className="font-medium text-neutral-700">
                       Voiceover Narration Script
                     </span>
                     <button
                       type="button"
                       onClick={() => setVoiceoverScript("")}
-                      className="inline-flex items-center gap-1 font-mono text-[10px] font-bold text-black hover:underline"
+                      className="inline-flex items-center gap-1 text-[11px] text-neutral-400 hover:text-neutral-700"
                     >
-                      <RotateCcw className="h-2.5 w-2.5" />
-                      <span>Reset to AI default</span>
+                      <RotateCcw className="h-3 w-3" />
+                      <span>Reset</span>
                     </button>
                   </div>
                   <textarea
                     rows={3}
                     value={voiceoverScript || defaultVoiceoverScript}
                     onChange={(e) => setVoiceoverScript(e.target.value)}
-                    className="w-full border-2 border-black bg-white p-2 font-mono text-[11px] text-black focus:outline-none"
+                    className="w-full rounded-lg border border-black/[0.08] p-2 text-xs text-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-400"
                     placeholder="Enter narration script..."
                   />
-                  <div className="flex flex-wrap gap-1 font-mono text-[9px] text-black/70">
-                    <span className="border border-black bg-white px-1 py-0.5">Beat 1: Hook</span>
-                    <span>→</span>
-                    <span className="border border-black bg-white px-1 py-0.5">Beat 2: Product</span>
-                    <span>→</span>
-                    <span className="border border-black bg-white px-1 py-0.5">Beat 3: Audience</span>
-                    <span>→</span>
-                    <span className="border border-black bg-white px-1 py-0.5">Beat 4: CTA</span>
-                  </div>
                 </div>
               )}
             </div>
@@ -678,88 +651,68 @@ export function VideoStudioPlayer({
         </div>
 
         {/* Render CTAs */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black pt-2">
-          <span className="font-mono text-[11px] text-black/70">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-black/[0.06] pt-3">
+          <span className="text-xs text-neutral-500">
             {isLiveBackend && campaignId
-              ? "FastAPI orchestrator renders beat-synced H.264 MP4 with FFmpeg"
-              : "Simulated Ops: 60fps Canvas Kinetic Preview with WebM capture"}
+              ? "FastAPI orchestrator renders 24fps H.264 MP4 with FFmpeg & audio"
+              : "Autonomous cinematic engine with AI voiceover and soundstage"}
           </span>
 
-          {isLiveBackend && campaignId ? (
-            <button
-              type="button"
-              disabled={isRenderingCut}
-              onClick={() =>
-                onRenderCustomCut(aspectRatio, shotStyle, {
-                  enableVoiceover,
-                  voice: selectedVoice,
-                  voiceoverScript: effectiveScript,
-                })
-              }
-              className="inline-flex items-center gap-1.5 border-2 border-black bg-[#10B981] px-4 py-1.5 font-mono text-xs font-black uppercase text-black shadow-[2px_2px_0px_#000000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none disabled:opacity-50"
-            >
-              {isRenderingCut ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  <span>RENDERING MP4...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-3.5 w-3.5" />
-                  <span>
-                    RENDER {aspectRatio} MP4{enableVoiceover ? " + VO" : ""}
-                  </span>
-                </>
-              )}
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={isRecordingWebm}
-              onClick={handleRecordClientWebm}
-              className="inline-flex items-center gap-1.5 border-2 border-black bg-[#10B981] px-3.5 py-1.5 font-mono text-xs font-black uppercase text-black shadow-[2px_2px_0px_#000000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none disabled:opacity-50"
-            >
-              {isRecordingWebm ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  <span>RECORDING 5S WEBM...</span>
-                </>
-              ) : (
-                <>
-                  <Download className="h-3.5 w-3.5" />
-                  <span>SAVE .WEBM</span>
-                </>
-              )}
-            </button>
-          )}
+          <button
+            type="button"
+            disabled={isRenderingCut}
+            onClick={() =>
+              onRenderCustomCut(aspectRatio, shotStyle, {
+                enableVoiceover,
+                voice: selectedVoice,
+                voiceoverScript: effectiveScript,
+              })
+            }
+            className="inline-flex items-center gap-1.5 rounded-full bg-[#0071E3] px-5 py-2 text-xs font-medium text-white shadow-sm transition hover:bg-[#0077ED] active:scale-[0.99] disabled:opacity-50"
+          >
+            {isRenderingCut ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <span>Rendering Cut...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>
+                  Render {aspectRatio === "9:16" ? "9:16 Reel" : "16:9 Cinema Cut"}
+                  {enableVoiceover ? " + VO" : ""}
+                </span>
+              </>
+            )}
+          </button>
         </div>
 
         {renderError && (
-          <p className="font-mono text-xs font-bold text-[#EF4444]">{renderError}</p>
+          <p className="text-xs font-medium text-rose-600">{renderError}</p>
         )}
       </div>
 
       {/* Main Video Stage */}
       {activeVideo ? (
         <div className="space-y-3">
-          <div className="border-2 border-black bg-black shadow-[4px_4px_0px_#000000]">
-            <div className="flex items-center justify-between border-b-2 border-black bg-white p-2.5">
-              <div className="flex items-center gap-2">
-                <Radio className="h-3.5 w-3.5 text-[#10B981]" />
-                <span className="truncate font-display text-xs font-black uppercase text-black">
+          <div className="overflow-hidden rounded-2xl border border-black/[0.08] bg-black shadow-lg">
+            <div className="flex items-center justify-between border-b border-white/10 bg-neutral-900/90 px-4 py-3">
+              <div className="flex items-center gap-2.5">
+                <Radio className="h-3.5 w-3.5 text-[#0071E3]" />
+                <span className="truncate text-xs font-semibold text-white">
                   {activeVideo.title}
                 </span>
-                <span className="border border-black bg-[#E6F7EB] px-1.5 py-0.5 font-mono text-[9px] font-bold text-black">
-                  H.264 MP4 · {activeVideo.aspectRatio}
+                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-neutral-300">
+                  H.264 · {activeVideo.aspectRatio}
                 </span>
               </div>
               <a
                 href={activeVideo.videoUrl}
                 download={`${slugify(activeVideo.title)}.mp4`}
-                className="inline-flex items-center gap-1 border-2 border-black bg-[#10B981] px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase text-black shadow-[1px_1px_0px_#000000]"
+                className="inline-flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 px-3 py-1 text-xs font-medium text-white transition"
               >
-                <Download className="h-3 w-3" />
-                <span>DOWNLOAD MP4</span>
+                <Download className="h-3.5 w-3.5" />
+                <span>Download MP4</span>
               </a>
             </div>
 
@@ -773,35 +726,39 @@ export function VideoStudioPlayer({
                 loop
                 muted
                 className={cn(
-                  "border border-white/20 bg-black",
+                  "rounded-lg bg-black shadow-inner",
                   activeVideo.aspectRatio === "9:16"
-                    ? "max-h-[440px] w-auto"
+                    ? "max-h-[460px] aspect-[9/16] w-auto"
                     : "aspect-video w-full"
                 )}
               />
             </div>
           </div>
+
           {/* Generated Cuts Switcher */}
           {videos.length > 1 && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-medium text-neutral-500 mr-1">Cuts:</span>
               {videos.map((vid, idx) => (
                 <button
                   key={vid.id}
                   type="button"
                   onClick={() => setActiveVideoIndex(idx)}
                   className={cn(
-                    "inline-flex items-center gap-1.5 border-2 border-black px-3 py-1 font-mono text-xs font-bold uppercase transition",
+                    "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition",
                     idx === activeVideoIndex
-                      ? "bg-[#10B981] text-black shadow-[2px_2px_0px_#000000]"
-                      : "bg-white text-black/70 hover:bg-[#F5F5F7]"
+                      ? "bg-neutral-900 text-white shadow-sm"
+                      : "border border-black/[0.08] bg-white text-neutral-700 hover:bg-neutral-100/70"
                   )}
                 >
-                  <Film className="h-3 w-3" />
+                  <Film className="h-3.5 w-3.5" />
                   <span>
                     Cut 0{idx + 1} · {vid.aspectRatio}
                   </span>
-                  {(vid.hasVoiceover || vid.title.includes("VO:") || vid.promptSummary?.includes("VO:")) && (
-                    <span className="inline-flex items-center gap-0.5 border border-black bg-white px-1 font-mono text-[9px] text-black">
+                  {(vid.hasVoiceover ||
+                    vid.title.includes("VO:") ||
+                    vid.promptSummary?.includes("VO:")) && (
+                    <span className="inline-flex items-center gap-0.5 rounded-full bg-neutral-200/60 px-1.5 py-0.2 text-[9px] text-neutral-700">
                       <Mic className="h-2.5 w-2.5" />
                       <span>VO</span>
                     </span>
@@ -812,21 +769,25 @@ export function VideoStudioPlayer({
           )}
         </div>
       ) : (
-        /* 60fps Canvas Stage */
-        <div className="border-2 border-black bg-black shadow-[4px_4px_0px_#000000]">
-          <div className="flex items-center justify-between border-b-2 border-black bg-white p-2.5">
+        /* Real-time Canvas Stage */
+        <div className="overflow-hidden rounded-2xl border border-black/[0.08] bg-black shadow-lg">
+          <div className="flex items-center justify-between border-b border-white/10 bg-neutral-900/90 px-4 py-3">
             <div className="flex items-center gap-2">
-              <Film className="h-4 w-4" />
-              <span className="font-display text-xs font-black uppercase text-black">
-                REAL-TIME MOTION KINETIC ENGINE (60 FPS)
+              <Film className="h-4 w-4 text-[#0071E3]" />
+              <span className="text-xs font-medium text-white">
+                Real-Time Motion Canvas Preview (60 FPS)
               </span>
             </div>
             <button
               type="button"
               onClick={() => setIsPlayingCanvas((p) => !p)}
-              className="border-2 border-black bg-[#E6F7EB] px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase text-black shadow-[1px_1px_0px_#000000]"
+              className="rounded-full bg-white/10 hover:bg-white/20 p-1.5 text-white transition"
             >
-              {isPlayingCanvas ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+              {isPlayingCanvas ? (
+                <Pause className="h-3.5 w-3.5" />
+              ) : (
+                <Play className="h-3.5 w-3.5" />
+              )}
             </button>
           </div>
 
@@ -836,8 +797,10 @@ export function VideoStudioPlayer({
               width={aspectRatio === "9:16" ? 720 : 1280}
               height={aspectRatio === "9:16" ? 1280 : 720}
               className={cn(
-                "border border-white/20 bg-black",
-                aspectRatio === "9:16" ? "max-h-[440px] w-auto" : "aspect-video w-full"
+                "rounded-lg bg-black",
+                aspectRatio === "9:16"
+                  ? "max-h-[460px] aspect-[9/16] w-auto"
+                  : "aspect-video w-full"
               )}
             />
           </div>
@@ -845,19 +808,28 @@ export function VideoStudioPlayer({
       )}
 
       {/* Director Beats Spec Grid */}
-      <div className="border-2 border-black bg-white p-3 shadow-[2px_2px_0px_#000000]">
-        <div className="border-b border-black pb-1.5 font-display text-xs font-black uppercase text-black">
-          DIRECTOR SHOT CHOREOGRAPHY &amp; BEATS
+      <div className="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm">
+        <div className="border-b border-black/[0.06] pb-2 text-xs font-semibold text-[#1D1D1F]">
+          Director Shot Choreography &amp; Beats
         </div>
-        <div className="grid grid-cols-2 gap-2 pt-2 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 pt-3 sm:grid-cols-4">
           {DIRECTOR_BEATS.map((beat) => (
-            <div key={beat.beat} className="border border-black bg-[#E6F7EB]/40 p-2 font-mono text-[11px]">
+            <div
+              key={beat.beat}
+              className="rounded-xl border border-black/[0.06] bg-[#FBFBFD] p-3 text-xs"
+            >
               <div className="flex items-center justify-between">
-                <span className="font-bold text-black">BEAT {beat.beat}</span>
-                <span className="text-black/60">{beat.window}</span>
+                <span className="font-semibold text-neutral-800">
+                  Beat {beat.beat}
+                </span>
+                <span className="text-[10px] text-neutral-400">{beat.window}</span>
               </div>
-              <div className="mt-1 font-display font-bold uppercase text-black">{beat.label}</div>
-              <div className="text-[10px] text-black/70">{beat.move}</div>
+              <div className="mt-1 font-medium text-neutral-900">
+                {beat.label}
+              </div>
+              <div className="mt-0.5 text-[11px] text-neutral-500">
+                {beat.move}
+              </div>
             </div>
           ))}
         </div>

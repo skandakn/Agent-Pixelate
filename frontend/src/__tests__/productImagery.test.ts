@@ -4,6 +4,7 @@ import {
   getProductVisualOptions,
 } from "@/lib/productImagery";
 import { DEMO_PRESETS } from "@/data/presets";
+import { CampaignBrief } from "@/types/campaign";
 
 describe("productImagery & Commercial Poster Engine", () => {
   it("resolves tailored poster metadata for hydration bottle", () => {
@@ -44,12 +45,12 @@ describe("productImagery & Commercial Poster Engine", () => {
   });
 
   it("falls back gracefully for unknown generic products", () => {
-    const genericBrief = {
+    const genericBrief: CampaignBrief = {
       productName: "Quantum Widget X",
       productDescription: "An enigmatic quantum device with mysterious properties.",
       targetAudience: "Quantum physicists",
       brandTone: "Bold",
-      platforms: ["Instagram" as const],
+      platforms: ["Instagram"],
     };
     const meta = getPosterMetadataForBrief(genericBrief);
     expect(meta.headlines).toHaveLength(3);

@@ -20,9 +20,14 @@ import {
   CampaignVideoAsset,
   ConnectionMode,
   PipelineStage,
+  VideoAspectRatio,
+  VideoShotStyle,
 } from "@/types/campaign";
 import { BLANK_CUSTOM_BRIEF, DEMO_PRESETS } from "@/data/presets";
-import { launchCampaignSession } from "@/lib/campaignClient";
+import {
+  launchCampaignSession,
+  requestCustomVideoCut,
+} from "@/lib/campaignClient";
 import { exportCampaignZip } from "@/lib/exportKit";
 import { cn } from "@/lib/utils";
 import { TopNav } from "@/components/TopNav";
@@ -103,9 +108,13 @@ export function CampaignWorkspace() {
   const [partialAssets, setPartialAssets] = useState<Partial<CampaignAssets>>({});
   const [finalAssets, setFinalAssets] = useState<CampaignAssets | null>(null);
   const [extraVideos, setExtraVideos] = useState<CampaignVideoAsset[]>([]);
+  const [isRenderingCut, setIsRenderingCut] = useState(false);
+  const [videoRenderError, setVideoRenderError] = useState<string | null>(null);
   const [isExportingZip, setIsExportingZip] = useState(false);
   const [activeTab, setActiveTab] = useState<"visuals" | "copy" | "activity">("visuals");
   const [isSendingMsg, setIsSendingMsg] = useState(false);
+
+  const isLiveBackend = resolvedMode === "live";
 
   const controllerRef = useRef<{ cancel: () => void } | null>(null);
 
@@ -184,6 +193,72 @@ export function CampaignWorkspace() {
       setIsExportingZip(false);
     }
   }, [finalAssets, extraVideos]);
+
+  const handleRenderCustomCut = useCallback(
+    async (
+      aspectRatio: VideoAspectRatio,
+      shotStyle: VideoShotStyle,
+      voiceoverOptions?: {
+        enableVoiceover?: boolean;
+        voice?: string;
+        voiceoverScript?: string;
+      }
+    ) => {
+      setIsRenderingCut(true);
+      setVideoRenderError(null);
+      try {
+        let newVideo: CampaignVideoAsset;
+        if (isLiveBackend && campaignId) {
+          newVideo = await requestCustomVideoCut(
+            campaignId,
+            aspectRatio,
+            shotStyle,
+            voiceoverOptions
+          );
+        } else {
+          // Simulated cinematic cut synthesis
+          const styleLabel = shotStyle
+            .replace(/_/g, " ")
+            .replace(/\b\w/g, (c) => c.toUpperCase());
+          const cutNum = (extraVideos.length + 3).toString().padStart(2, "0");
+          const voVoice =
+            voiceoverOptions?.voice === "david"
+              ? "David Executive"
+              : "Aria Studio";
+          const chosenVideoUrl =
+            aspectRatio === "9:16"
+              ? "/videos/lumadrop-reels-9x16.mp4"
+            : shotStyle === "luxury_editorial"
+              ? "/videos/kuroha-cinema-16x9.mp4"
+            : shotStyle === "pulse_drop"
+              ? "/videos/aetherpods-cinema-16x9.mp4"
+              : "/videos/lumadrop-cinema-16x9.mp4";
+
+          await new Promise((r) => setTimeout(r, 900));
+          newVideo = {
+            id: `vid_custom_${Date.now().toString(36)}`,
+            title: `${brief?.productName || "Product"} — ${styleLabel} Cut ${cutNum} (${aspectRatio} · VO)`,
+            videoUrl: chosenVideoUrl,
+            aspectRatio,
+            shotStyle,
+            durationSec: 8,
+            promptSummary: `Synthesized ${styleLabel} cut (${aspectRatio}) with custom voiceover narration and ${brief?.brandTone || "dynamic"} pacing.`,
+            hasVoiceover: voiceoverOptions?.enableVoiceover ?? true,
+            voiceName: voVoice,
+            voiceoverScript: voiceoverOptions?.voiceoverScript,
+          };
+        }
+        setExtraVideos((prev) => [...prev, newVideo]);
+      } catch (err) {
+        setVideoRenderError(
+          err instanceof Error ? err.message : "Failed to render video cut."
+        );
+      } finally {
+        setIsRenderingCut(false);
+      }
+    },
+    [campaignId, isLiveBackend, brief?.productName, brief?.brandTone, extraVideos.length]
+  );
 
   const handleSendMessage = useCallback(
     async (message: string) => {

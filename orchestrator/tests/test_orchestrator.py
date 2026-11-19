@@ -133,6 +133,26 @@ def test_health_and_end_to_end_fallback_pipeline_with_websocket(tmp_path: Path) 
         memory_keys = {m["key"] for m in memories}
         assert {"campaign_brief", "visual_brief", "campaign_copy"}.issubset(memory_keys)
 
+        # 7. Verify on-demand Video cut generation & inline streaming response
+        vid_resp = client.post(
+            f"/api/campaigns/{campaign_id}/video",
+            json={
+                "aspect_ratio": "16:9",
+                "shot_style": "obsidian_cinema",
+                "enable_voiceover": True,
+            },
+        )
+        assert vid_resp.status_code == 201
+        vid_data = vid_resp.json()
+        assert vid_data["mime_type"] == "video/mp4"
+        assert vid_data["asset_url"].endswith(".mp4")
+
+        # 8. Verify streaming the MP4 file with inline disposition
+        stream_resp = client.get(vid_data["asset_url"])
+        assert stream_resp.status_code == 200
+        assert stream_resp.headers["content-type"] == "video/mp4"
+        assert "inline" in stream_resp.headers.get("content-disposition", "")
+
 
 def test_external_agent_callbacks_trigger_band_handoff(tmp_path: Path) -> None:
     settings = Settings(

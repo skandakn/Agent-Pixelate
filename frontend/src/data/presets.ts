@@ -2,12 +2,14 @@ import {
   BrandTone,
   CampaignAssets,
   CampaignBrief,
+  CampaignVideoAsset,
   ColorSwatch,
   ContextHandoffPayload,
   DemoPreset,
   MetaAdVariant,
   SocialPost,
   StoryboardFrame,
+  VideoShotStyle,
   VisualCreative,
   VisualOption,
 } from "@/types/campaign";
@@ -551,6 +553,56 @@ export function buildSimulatedCampaignAssets(
     "#AgentPixelate",
   ];
 
+  const productNameLower = brief.productName.toLowerCase();
+  let defaultVideoUrl = "/videos/lumadrop-cinema-16x9.mp4";
+  const defaultReelUrl = "/videos/lumadrop-reels-9x16.mp4";
+  let defaultShotStyle: VideoShotStyle = "obsidian_cinema";
+
+  if (
+    productNameLower.includes("pod") ||
+    productNameLower.includes("ear") ||
+    productNameLower.includes("audio") ||
+    tone === "Bold"
+  ) {
+    defaultVideoUrl = "/videos/aetherpods-cinema-16x9.mp4";
+    defaultShotStyle = "pulse_drop";
+  } else if (
+    productNameLower.includes("matcha") ||
+    productNameLower.includes("kuroha") ||
+    tone === "Luxury"
+  ) {
+    defaultVideoUrl = "/videos/kuroha-cinema-16x9.mp4";
+    defaultShotStyle = "luxury_editorial";
+  }
+
+  const simulatedVideos: CampaignVideoAsset[] = [
+    {
+      id: `vid_cinema_${campaignId}`,
+      title: `${brief.productName} — Cinema Launch Cut (16:9 · VO)`,
+      videoUrl: defaultVideoUrl,
+      aspectRatio: "16:9",
+      shotStyle: defaultShotStyle,
+      durationSec: 8,
+      promptSummary: `Cinematic 24fps promo with ${primaryHex} & ${accentHex} lighting, Ken Burns hero framing, and AI voiceover narration.`,
+      hasVoiceover: true,
+      voiceName: tone === "Bold" ? "David Executive" : "Aria Studio",
+      voiceoverScript: `Introducing ${brief.productName}. Built for ${audience.slice(0, 40)}. Experience the drop today.`,
+    },
+    {
+      id: `vid_reels_${campaignId}`,
+      title: `${brief.productName} — Vertical Social Reel (9:16 · VO)`,
+      videoUrl: defaultReelUrl,
+      aspectRatio: "9:16",
+      shotStyle: "pulse_drop",
+      durationSec: 8,
+      promptSummary:
+        "Vertical 9:16 kinetic reveal with beat-synced shockwave cuts, brand swatch token rail, and high-energy narration.",
+      hasVoiceover: true,
+      voiceName: "David Executive",
+      voiceoverScript: `${brief.productName}: Cut through the noise. Available now.`,
+    },
+  ];
+
   return {
     campaignId,
     generatedAt: new Date().toISOString(),
@@ -558,7 +610,7 @@ export function buildSimulatedCampaignAssets(
     artDirectionSummary: `${tone} Obsidian-canvas visual language pairing high-contrast macro lighting (${primaryHex} & ${accentHex}) with crisp editorial copy engineered for ${audience}.`,
     palette,
     creatives,
-    videos: [],
+    videos: simulatedVideos,
     storyboard,
     handoff,
     socialPosts,
