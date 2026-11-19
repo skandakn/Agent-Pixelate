@@ -15,6 +15,7 @@ and harmonic pads) into a web-ready H.264 MP4 (`yuv420p`, `+faststart`).
 
 from __future__ import annotations
 
+import io
 import logging
 import math
 import os
@@ -24,6 +25,7 @@ import struct
 import subprocess
 import tempfile
 import wave
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -31,6 +33,10 @@ from typing import Literal
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 logger = logging.getLogger(__name__)
+
+# In-memory waveform caches to eliminate repeated synthesis latency
+_SOUNDTRACK_CACHE: dict[tuple[float, str], bytes] = {}
+_VOICEOVER_CACHE: dict[tuple[str, str, str, float], bytes] = {}
 
 ShotStyle = Literal[
     "obsidian_cinema",
@@ -425,6 +431,11 @@ def _synthesize_soundtrack_wav(
     wav_path: Path, duration_sec: float, shot_style: ShotStyle
 ) -> None:
     """Synthesize a stereo layered cinema score with risers, sub-bass hits, & style percussion."""
+    cache_key = (round(duration_sec, 2), shot_style)
+    if cache_key in _SOUNDTRACK_CACHE:
+        wav_path.write_bytes(_SOUNDTRACK_CACHE[cache_key])
+        return
+
     sample_rate = 22050
     total_samples = int(duration_sec * sample_rate)
 
@@ -577,11 +588,16 @@ def _synthesize_soundtrack_wav(
         r_s = int(max(-0.94, min(0.94, right * env)) * 32767)
         struct.pack_into("<hh", frames, i * 4, l_s, r_s)
 
-    with wave.open(str(wav_path), "wb") as wf:
-        wf.setnchannels(2)
-        wf.setsampwidth(2)
-        wf.setframerate(sample_rate)
-        wf.writeframes(bytes(frames))
+    with io.BytesIO() as bio:
+        with wave.open(bio, "wb") as wf:
+            wf.setnchannels(2)
+            wf.setsampwidth(2)
+            wf.setframerate(sample_rate)
+            wf.writeframes(bytes(frames))
+        wav_file_bytes = bio.getvalue()
+
+    _SOUNDTRACK_CACHE[cache_key] = wav_file_bytes
+    wav_path.write_bytes(wav_file_bytes)
 
 
 def _synthesize_formant_wav(
@@ -623,6 +639,18 @@ def _synthesize_formant_wav(
         wf.writeframes(bytes(frames))
 
 
+def _cache_voiceover_and_return(
+    cache_key: tuple[str, str, str, float], path: Path
+) -> bool:
+    if path.exists() and path.stat().st_size > 1000:
+        try:
+            _VOICEOVER_CACHE[cache_key] = path.read_bytes()
+        except Exception:
+            pass
+        return True
+    return False
+
+
 def _synthesize_voiceover_wav(
     script: str,
     output_wav_path: Path,
@@ -634,6 +662,11 @@ def _synthesize_voiceover_wav(
     clean_script = script.strip()
     if not clean_script:
         return False
+
+    cache_key = (clean_script, voice.lower(), brand_tone.lower(), round(duration_sec, 2))
+    if cache_key in _VOICEOVER_CACHE:
+        output_wav_path.write_bytes(_VOICEOVER_CACHE[cache_key])
+        return True
 
     output_wav_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -701,7 +734,7 @@ $syn.Dispose()
                         target,
                         output_wav_path.name,
                     )
-                    return True
+                    return _cache_voiceover_and_return(cache_key, output_wav_path)
         except Exception as exc:
             logger.warning("Windows SAPI voiceover synthesis fallback: %s", exc)
 
@@ -720,7 +753,7 @@ $syn.Dispose()
                     and output_wav_path.stat().st_size > 1000
                 ):
                     logger.info("Synthesized voiceover via %s", espeak_bin)
-                    return True
+                    return _cache_voiceover_and_return(cache_key, output_wav_path)
             except Exception as exc:
                 logger.warning("%s voiceover synthesis error: %s", espeak_bin, exc)
 
@@ -743,7 +776,7 @@ $syn.Dispose()
                 aiff_path.unlink(missing_ok=True)
                 if output_wav_path.exists() and output_wav_path.stat().st_size > 1000:
                     logger.info("Synthesized voiceover via macOS say")
-                    return True
+                    return _cache_voiceover_and_return(cache_key, output_wav_path)
         except Exception as exc:
             logger.warning("macOS say voiceover synthesis error: %s", exc)
 
@@ -751,7 +784,7 @@ $syn.Dispose()
     try:
         _synthesize_formant_wav(output_wav_path, clean_script, duration_sec=duration_sec)
         logger.info("Synthesized voiceover via harmonic vocalizer fallback")
-        return True
+        return _cache_voiceover_and_return(cache_key, output_wav_path)
     except Exception as exc:
         logger.error("Failed all voiceover synthesis engines: %s", exc)
         return False
@@ -1094,6 +1127,96 @@ def _paste_ken_burns_hero_card(
 
 
 # ---------------------------------------------------------------------------
+# Precomputed Typography & Layout Geometry for Ultra-Fast Frame Streaming
+# ---------------------------------------------------------------------------
+
+
+@dataclass(slots=True)
+class PrecomputedLayout:
+    hook_lines: list[str]
+    sub_lines: list[str]
+    b2_brand_lines: list[str]
+    desc_lines: list[str]
+    aud_lines: list[str]
+    b4_brand_lines: list[str]
+    b4_brand_widths: list[int]
+    tag_width: int
+    cta_width: int
+    cta_height: int
+    b1_pill_w: int
+    brand_header_w: int
+    b1_pill_txt: str
+    b2_pill_txt: str
+    b3_pill_txt: str
+    cta_txt: str
+
+
+def _prepare_layout(
+    spec: VideoRenderSpec,
+    fonts: dict[str, ImageFont.FreeTypeFont | ImageFont.ImageFont],
+    width: int,
+    height: int,
+    pad: int,
+) -> PrecomputedLayout:
+    is_vertical = height > width
+    text_max_w = (width - 2 * pad - 68) if is_vertical else int(width * 0.50)
+    display_font = fonts["display"]
+    body_font = fonts["body"]
+    subdisplay_font = fonts["subdisplay"]
+    mono_xs = fonts["mono_xs"]
+    mono_sm = fonts["mono_sm"]
+
+    scratch = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
+    d = ImageDraw.Draw(scratch)
+
+    hook_lines = _wrap_text(d, spec.hook.upper(), display_font, text_max_w, max_lines=3)
+    sub_lines = _wrap_text(d, f"Introducing {spec.brand_name}.", body_font, text_max_w, max_lines=2)
+    b2_brand_lines = _wrap_text(d, spec.brand_name, display_font, text_max_w, max_lines=2)
+    desc_lines = _wrap_text(d, spec.description[:155], body_font, text_max_w, max_lines=3)
+    aud_lines = _wrap_text(d, f"Crafted for {spec.target_audience}", subdisplay_font, text_max_w, max_lines=3)
+    b4_brand_lines = _wrap_text(d, spec.brand_name.upper(), display_font, width - 2 * pad - 60, max_lines=2)
+
+    b4_brand_widths: list[int] = []
+    for bl in b4_brand_lines:
+        bb = d.textbbox((0, 0), bl, font=display_font)
+        b4_brand_widths.append(bb[2] - bb[0])
+
+    tb = d.textbbox((0, 0), spec.tagline[:78], font=body_font)
+    tag_width = tb[2] - tb[0]
+
+    cta_txt = f"{spec.cta_label.upper()}  →"
+    cb = d.textbbox((0, 0), cta_txt, font=mono_sm)
+    cta_width = (cb[2] - cb[0]) + 52
+    cta_height = 44
+
+    b1_pill_txt = f"01 // {spec.brand_tone.upper()} LAUNCH"
+    pb = d.textbbox((0, 0), b1_pill_txt, font=mono_xs)
+    b1_pill_w = (pb[2] - pb[0]) + 28
+
+    bh_box = d.textbbox((0, 0), spec.brand_name.upper()[:28], font=mono_sm)
+    brand_header_w = bh_box[2] - bh_box[0]
+
+    return PrecomputedLayout(
+        hook_lines=hook_lines,
+        sub_lines=sub_lines,
+        b2_brand_lines=b2_brand_lines,
+        desc_lines=desc_lines,
+        aud_lines=aud_lines,
+        b4_brand_lines=b4_brand_lines,
+        b4_brand_widths=b4_brand_widths,
+        tag_width=tag_width,
+        cta_width=cta_width,
+        cta_height=cta_height,
+        b1_pill_w=b1_pill_w,
+        brand_header_w=brand_header_w,
+        b1_pill_txt=b1_pill_txt,
+        b2_pill_txt="02 // ENGINEERED DIFFERENCE",
+        b3_pill_txt="03 // BUILT FOR YOUR WORLD",
+        cta_txt=cta_txt,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Continuous-Camera Motion Frame Renderer (24fps)
 # ---------------------------------------------------------------------------
 
@@ -1106,11 +1229,11 @@ def _render_frame(
     height: int,
     spec: VideoRenderSpec,
     fonts: dict[str, ImageFont.FreeTypeFont | ImageFont.ImageFont],
+    layout: PrecomputedLayout,
     base_canvas: Image.Image,
     glow_primary: Image.Image,
     glow_accent: Image.Image,
-    vignette: Image.Image,
-    grain_tile: Image.Image,
+    finishing_tile: Image.Image,
     hero_images: list[Image.Image],
     bg_rgb: tuple[int, int, int],
     primary_rgb: tuple[int, int, int],
@@ -1169,7 +1292,6 @@ def _render_frame(
 
     if spec.shot_style == "ink_press":
         overlay.rectangle((pad, pad, width - pad, height - pad), outline=(24, 24, 27, 190), width=2)
-        # Print registration crosshairs in corners
         for rx, ry in ((pad - 8, pad - 8), (width - pad + 8, pad - 8), (pad - 8, height - pad + 8), (width - pad + 8, height - pad + 8)):
             overlay.line((rx - 6, ry, rx + 6, ry), fill=(24, 24, 27, 140), width=1)
             overlay.line((rx, ry - 6, rx, ry + 6), fill=(24, 24, 27, 140), width=1)
@@ -1180,7 +1302,6 @@ def _render_frame(
             outline=border_col,
             width=2 if spec.shot_style == "vox_collage" else 1,
         )
-        # Film gate corner indicators ⌜ ⌝ ⌞ ⌟
         if spec.shot_style in ("obsidian_cinema", "cyberpunk_neon", "golden_hour_film", "titanium_minimal", "luxury_editorial"):
             _draw_camera_gate_telemetry(
                 overlay,
@@ -1225,8 +1346,7 @@ def _render_frame(
             else "ZIRA"
         )
         vo_txt = f"VO // {vo_target}"
-        b_box = overlay.textbbox((0, 0), spec.brand_name.upper()[:28], font=fonts["mono_sm"])
-        vo_x = pad + 32 + (b_box[2] - b_box[0]) + 16
+        vo_x = pad + 32 + layout.brand_header_w + 16
         if vo_x < width - pad - 210:
             overlay.text((vo_x, pad + 16), vo_txt, font=fonts["mono_xs"], fill=(*primary_rgb, 220))
             for eq_i in range(3):
@@ -1280,7 +1400,6 @@ def _render_frame(
     prism_cy = (height * 0.31) if is_vertical else (height * 0.54)
 
     if hero_images and t < b3 + 0.15:
-        # Select primary hero image (swap cleanly on Beat 3 if 2+ Gemini images exist)
         active_hero = hero_images[1] if (len(hero_images) > 1 and t >= b2) else hero_images[0]
         card_w = int(width * (0.72 if is_vertical else 0.34))
         card_h = int(card_w * (0.68 if not is_vertical else 0.72))
@@ -1300,7 +1419,6 @@ def _render_frame(
         )
         overlay = ImageDraw.Draw(img, "RGBA")
     else:
-        # Sculptural orbital monolith when no raster hero image is present or on end lockup
         mono_cx = (width * 0.50) if is_vertical else (width * (0.74 - 0.24 * end_shift))
         prism_scale = 0.86 + 0.20 * math.sin(progress * math.pi) + 0.06 * beat_pulse
         base_r = min(width, height) * (0.20 if not is_vertical else 0.19) * prism_scale
@@ -1327,7 +1445,7 @@ def _render_frame(
         ]
         overlay.polygon(inner_pts, fill=(*bg_rgb, 185), outline=(*text_rgb, 170))
 
-    # Pulse-drop acoustic spectrum bars (always visible under hero subject in pulse_drop)
+    # Pulse-drop acoustic spectrum bars
     if spec.shot_style in ("pulse_drop", "obsidian_cinema") and t < b3:
         num_bars = 16
         bar_w = 5
@@ -1346,7 +1464,6 @@ def _render_frame(
 
     # 4. Four Continuous Dramaturgy Beats with Masked Baseline Typography Reveals
     text_x = pad + 34
-    text_max_w = (width - 2 * pad - 68) if is_vertical else int(width * 0.50)
     text_base_y = int(height * 0.58) if is_vertical else int(height * 0.30)
     display_lh = 52 if not is_vertical else 44
     vox_hl = (250, 204, 21) if spec.shot_style == "vox_collage" else None
@@ -1360,9 +1477,8 @@ def _render_frame(
         fade_out = 1.0 - _clamp01((t - (b1 - 0.28)) / 0.28)
         alpha = int(255 * _clamp01(e) * fade_out)
 
-        pill_txt = f"01 // {spec.brand_tone.upper()} LAUNCH"
-        pb = overlay.textbbox((0, 0), pill_txt, font=fonts["mono_xs"])
-        pw = (pb[2] - pb[0]) + 28
+        pill_txt = layout.b1_pill_txt
+        pw = layout.b1_pill_w
         overlay.rounded_rectangle(
             (text_x, text_base_y - 44, text_x + pw, text_base_y - 18),
             radius=6 if spec.shot_style in ("vox_collage", "ink_press") else 13,
@@ -1376,7 +1492,7 @@ def _render_frame(
             fill=(*text_rgb, alpha) if not is_light_ground else (255, 255, 255, alpha),
         )
 
-        lines = _wrap_text(overlay, spec.hook.upper(), fonts["display"], text_max_w, max_lines=3)
+        lines = layout.hook_lines
         _draw_masked_text_lines(
             img,
             x=text_x,
@@ -1391,7 +1507,7 @@ def _render_frame(
         )
         overlay = ImageDraw.Draw(img, "RGBA")
         sub_y = text_base_y + len(lines) * display_lh + 14
-        sub_lines = _wrap_text(overlay, f"Introducing {spec.brand_name}.", fonts["body"], text_max_w, max_lines=2)
+        sub_lines = layout.sub_lines
         for idx_s, sline in enumerate(sub_lines):
             overlay.text((text_x, sub_y + idx_s * 26), sline, font=fonts["body"], fill=(*muted_rgb, int(alpha * 0.92)))
 
@@ -1405,11 +1521,11 @@ def _render_frame(
 
         overlay.text(
             (text_x, text_base_y - 34),
-            "02 // ENGINEERED DIFFERENCE",
+            layout.b2_pill_txt,
             font=fonts["mono_sm"],
             fill=(*accent_rgb, alpha) if not is_light_ground else (*primary_rgb, alpha),
         )
-        lines = _wrap_text(overlay, spec.brand_name, fonts["display"], text_max_w, max_lines=2)
+        lines = layout.b2_brand_lines
         _draw_masked_text_lines(
             img,
             x=text_x,
@@ -1424,7 +1540,7 @@ def _render_frame(
         )
         overlay = ImageDraw.Draw(img, "RGBA")
         desc_y = text_base_y + len(lines) * display_lh + 14
-        desc_lines = _wrap_text(overlay, spec.description[:155], fonts["body"], text_max_w, max_lines=3)
+        desc_lines = layout.desc_lines
         for idx_d, dline in enumerate(desc_lines):
             overlay.text((text_x, desc_y + idx_d * 27), dline, font=fonts["body"], fill=(*muted_rgb, int(alpha * 0.94)))
 
@@ -1439,17 +1555,11 @@ def _render_frame(
 
         overlay.text(
             (text_x + x_shift, text_base_y - 34),
-            "03 // BUILT FOR YOUR WORLD",
+            layout.b3_pill_txt,
             font=fonts["mono_sm"],
             fill=(*primary_rgb, alpha),
         )
-        aud_lines = _wrap_text(
-            overlay,
-            f"Crafted for {spec.target_audience}",
-            fonts["subdisplay"],
-            text_max_w,
-            max_lines=3,
-        )
+        aud_lines = layout.aud_lines
         _draw_masked_text_lines(
             img,
             x=text_x + x_shift,
@@ -1496,10 +1606,9 @@ def _render_frame(
         center_x = width // 2
         lock_y = int(height * (0.52 if is_vertical else 0.36)) + y_shift
 
-        b_lines = _wrap_text(overlay, spec.brand_name.upper(), fonts["display"], width - 2 * pad - 60, max_lines=2)
+        b_lines = layout.b4_brand_lines
         for idx_b, bline in enumerate(b_lines):
-            bb = overlay.textbbox((0, 0), bline, font=fonts["display"])
-            bw = bb[2] - bb[0]
+            bw = layout.b4_brand_widths[idx_b]
             overlay.text(
                 (center_x - bw // 2, lock_y + idx_b * display_lh),
                 bline,
@@ -1509,9 +1618,8 @@ def _render_frame(
 
         tag_y = lock_y + len(b_lines) * display_lh + 12
         tag_text = spec.tagline[:78]
-        tb = overlay.textbbox((0, 0), tag_text, font=fonts["body"])
         overlay.text(
-            (center_x - (tb[2] - tb[0]) // 2, tag_y),
+            (center_x - layout.tag_width // 2, tag_y),
             tag_text,
             font=fonts["body"],
             fill=(*muted_rgb, int(alpha * 0.94)),
@@ -1519,10 +1627,9 @@ def _render_frame(
 
         # Pulsing CTA Button Pill
         cta_y = tag_y + 48
-        cta_txt = f"{spec.cta_label.upper()}  →"
-        cb = overlay.textbbox((0, 0), cta_txt, font=fonts["mono_sm"])
-        cw = (cb[2] - cb[0]) + 52
-        ch = 44
+        cta_txt = layout.cta_txt
+        cw = layout.cta_width
+        ch = layout.cta_height
         btn_col = (24, 24, 27) if is_light_ground else _blend(primary_rgb, accent_rgb, 0.35 + 0.25 * beat_pulse)
         overlay.rounded_rectangle(
             (center_x - cw // 2, cta_y, center_x + cw // 2, cta_y + ch),
@@ -1532,7 +1639,7 @@ def _render_frame(
             width=2,
         )
         overlay.text(
-            (center_x - (cb[2] - cb[0]) // 2, cta_y + 13),
+            (center_x - (cw - 52) // 2, cta_y + 13),
             cta_txt,
             font=fonts["mono_sm"],
             fill=(255, 255, 255, alpha),
@@ -1579,9 +1686,8 @@ def _render_frame(
         nx = bar_x0 + int(bar_len * frac)
         overlay.rectangle((nx - 1, bar_y - 2, nx + 1, bar_y + 6), fill=(*text_rgb, 110))
 
-    # 6. Anti-Slop Cinematic Finish: Optical Vignette + Animated Film Grain
-    img.paste(vignette, (0, 0), vignette)
-    img.paste(grain_tile, (0, 0), grain_tile)
+    # 6. Anti-Slop Cinematic Finish: Pre-composited Optical Vignette + Animated Film Grain
+    img.paste(finishing_tile, (0, 0), finishing_tile)
 
     return img.convert("RGB").tobytes()
 
@@ -1677,6 +1783,17 @@ def render_campaign_video_mp4(spec: VideoRenderSpec, output_path: Path) -> Path:
     cinematic_motes = _make_floating_cinematic_motes(count=28)
     vo_beats = build_voiceover_beats(spec) if spec.enable_voiceover else []
 
+    # Pre-composite optical vignette and film grain into ready finishing tiles (cuts per-frame alpha blits in half)
+    finishing_tiles: list[Image.Image] = []
+    for g in grain_tiles:
+        f = vignette.copy()
+        f.paste(g, (0, 0), g)
+        finishing_tiles.append(f)
+
+    # Precompute layout geometry & wrapped typography once across the entire video run
+    pad = int(min(width, height) * 0.045)
+    layout = _prepare_layout(spec, fonts, width, height, pad)
+
     card_target_w = int(width * (0.72 if height > width else 0.34))
     card_target_h = int(card_target_w * 0.7)
     hero_images = _load_hero_images(spec.hero_image_paths, card_target_w, card_target_h)
@@ -1730,9 +1847,13 @@ def render_campaign_video_mp4(spec: VideoRenderSpec, output_path: Path) -> Path:
                 "-c:v",
                 "libx264",
                 "-preset",
-                "veryfast",
+                "ultrafast",
+                "-tune",
+                "zerolatency",
+                "-threads",
+                "0",
                 "-crf",
-                "21",
+                "22",
                 "-pix_fmt",
                 "yuv420p",
                 "-c:a",
@@ -1767,9 +1888,13 @@ def render_campaign_video_mp4(spec: VideoRenderSpec, output_path: Path) -> Path:
                 "-c:v",
                 "libx264",
                 "-preset",
-                "veryfast",
+                "ultrafast",
+                "-tune",
+                "zerolatency",
+                "-threads",
+                "0",
                 "-crf",
-                "21",
+                "22",
                 "-pix_fmt",
                 "yuv420p",
                 "-c:a",
@@ -1789,32 +1914,38 @@ def render_campaign_video_mp4(spec: VideoRenderSpec, output_path: Path) -> Path:
             stderr=subprocess.PIPE,
         )
         assert proc.stdin is not None
+
+        workers = min(8, os.cpu_count() or 4)
+
+        def _worker(f_idx: int) -> bytes:
+            t = f_idx / spec.fps
+            return _render_frame(
+                t=t,
+                duration=spec.duration_sec,
+                width=width,
+                height=height,
+                spec=spec,
+                fonts=fonts,
+                layout=layout,
+                base_canvas=base_canvas,
+                glow_primary=glow_primary,
+                glow_accent=glow_accent,
+                finishing_tile=finishing_tiles[f_idx % len(finishing_tiles)],
+                hero_images=hero_images,
+                bg_rgb=bg_rgb,
+                primary_rgb=primary_rgb,
+                accent_rgb=accent_rgb,
+                text_rgb=text_rgb,
+                muted_rgb=muted_rgb,
+                is_light_ground=is_light_ground,
+                motes=cinematic_motes,
+                voiceover_beats=vo_beats,
+            )
+
         try:
-            for frame_idx in range(total_frames):
-                t = frame_idx / spec.fps
-                raw = _render_frame(
-                    t=t,
-                    duration=spec.duration_sec,
-                    width=width,
-                    height=height,
-                    spec=spec,
-                    fonts=fonts,
-                    base_canvas=base_canvas,
-                    glow_primary=glow_primary,
-                    glow_accent=glow_accent,
-                    vignette=vignette,
-                    grain_tile=grain_tiles[frame_idx % len(grain_tiles)],
-                    hero_images=hero_images,
-                    bg_rgb=bg_rgb,
-                    primary_rgb=primary_rgb,
-                    accent_rgb=accent_rgb,
-                    text_rgb=text_rgb,
-                    muted_rgb=muted_rgb,
-                    is_light_ground=is_light_ground,
-                    motes=cinematic_motes,
-                    voiceover_beats=vo_beats,
-                )
-                proc.stdin.write(raw)
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                for raw in executor.map(_worker, range(total_frames)):
+                    proc.stdin.write(raw)
             proc.stdin.flush()
         finally:
             proc.stdin.close()
