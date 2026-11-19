@@ -12,7 +12,7 @@ import {
   VisualOption,
 } from "@/types/campaign";
 import { CreativeMotif, generateCreativeSvg } from "@/lib/creativeArt";
-import { getProductVisualOptions } from "@/lib/productImagery";
+import { getPosterMetadataForBrief, getProductVisualOptions } from "@/lib/productImagery";
 
 export const DEMO_PRESETS: DemoPreset[] = [
   {
@@ -242,6 +242,7 @@ export function buildSimulatedCampaignAssets(
   });
 
   const visualOptions = getProductVisualOptions(brief, campaignId);
+  const posterMeta = getPosterMetadataForBrief(brief);
   const studioOpt = visualOptions[0] ?? {
     imageUrl: "https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=1400&q=85",
     lighting: "Dual-axis rim lighting with cool cyan bounce and obsidian negative space",
@@ -260,6 +261,12 @@ export function buildSimulatedCampaignAssets(
       platform: "Instagram",
       imageUrl: studioOpt.imageUrl,
       options: visualOptions,
+      headline: posterMeta.headlines[0] || h1,
+      tagline: posterMeta.tagline,
+      badge: posterMeta.badge,
+      ctaText: posterMeta.ctaText,
+      features: posterMeta.features,
+      posterTheme: "billboard",
       lighting: studioOpt.lighting ?? "Dual-axis rim lighting with cool cyan bounce and obsidian negative space",
       composition: studioOpt.composition ?? "Asymmetric rule-of-thirds split; tactile hardware silhouette anchored right",
       artNote:
@@ -275,6 +282,12 @@ export function buildSimulatedCampaignAssets(
       platform: "Meta Ads",
       imageUrl: lifestyleOpt.imageUrl,
       options: visualOptions,
+      headline: posterMeta.headlines[1] || h2,
+      tagline: posterMeta.tagline,
+      badge: "PERFORMANCE AD // CONVERSION 01",
+      ctaText: "SHOP THE DROP →",
+      features: posterMeta.features,
+      posterTheme: "swiss",
       lighting: lifestyleOpt.lighting ?? "Volumetric top key light with glowing accent halo around signature feature",
       composition: lifestyleOpt.composition ?? "Tight hero focus with micro-spec telemetry strip along bottom edge",
       artNote:
@@ -290,6 +303,12 @@ export function buildSimulatedCampaignAssets(
       platform: "LinkedIn",
       imageUrl: macroOpt.imageUrl,
       options: visualOptions,
+      headline: posterMeta.headlines[2] || h3,
+      tagline: posterMeta.tagline,
+      badge: "BRAND MANIFESTO // EXECUTIVE DROP",
+      ctaText: "DISCOVER IMPACT →",
+      features: posterMeta.features,
+      posterTheme: "luxury",
       lighting: macroOpt.lighting ?? "Soft architectural side-fill with subtle metallic sheen",
       composition: macroOpt.composition ?? "Panoramic layout balancing brand story headline and product proof",
       artNote:

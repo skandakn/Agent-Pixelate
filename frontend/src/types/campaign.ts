@@ -219,6 +219,8 @@ export interface VisualOption {
   composition?: string;
 }
 
+export type PosterTheme = "billboard" | "swiss" | "luxury" | "cyber";
+
 export interface VisualCreative {
   id: string;
   title: string;
@@ -233,6 +235,12 @@ export interface VisualCreative {
   artNote: string;
   promptSummary: string;
   options?: VisualOption[];
+  headline?: string;
+  tagline?: string;
+  badge?: string;
+  ctaText?: string;
+  features?: string[];
+  posterTheme?: PosterTheme;
 }
 
 export interface StoryboardFrame {
