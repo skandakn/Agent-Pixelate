@@ -29,6 +29,8 @@ from fastapi.staticfiles import StaticFiles
 from orchestrator.band_client import BandAdapter
 from orchestrator.config import Settings, get_settings
 from orchestrator.event_bus import AsyncEventBus
+from orchestrator.logging_config import RequestTracingMiddleware, setup_structured_logging
+from orchestrator.security import secrets
 from orchestrator.storage import CampaignStore
 from orchestrator.video_renderer import AspectRatio, ShotStyle
 from orchestrator.workflow import CampaignCoordinator
@@ -71,10 +73,13 @@ logger = logging.getLogger("agent_pixelate.orchestrator")
 
 
 def _configure_logging(level: str) -> None:
-    logging.basicConfig(
-        level=getattr(logging, level.upper(), logging.INFO),
-        format="%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
-    )
+    if os.getenv("STRUCTURED_LOGGING", "false").lower() in ("true", "1", "yes"):
+        setup_structured_logging(level)
+    else:
+        logging.basicConfig(
+            level=getattr(logging, level.upper(), logging.INFO),
+            format="%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
+        )
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -135,6 +140,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(RequestTracingMiddleware)
 
     @app.exception_handler(ValueError)
     async def value_error_handler(_request: Request, exc: ValueError) -> JSONResponse:
@@ -177,6 +183,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "gemini_enabled": bool(cfg.gemini_api_key),
             "band_transport": band.active_transport,
         }
+
+    @app.get("/api/security/audit", tags=["security"])
+    async def security_audit() -> dict[str, Any]:
+        """Audit status of configured provider secrets and encryption readiness without exposing plaintext."""
+        return secrets.get_status_report()
 
     @app.post(
         "/api/campaigns/generate",
