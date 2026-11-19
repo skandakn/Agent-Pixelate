@@ -2,12 +2,11 @@
 
 import React from "react";
 import { Loader2, RotateCcw, Sparkles } from "lucide-react";
-import { BrandTone, CampaignBrief, CampaignStatus, Platform } from "@/types/campaign";
+import { BrandTone, CampaignBrief, CampaignStatus } from "@/types/campaign";
 import { BLANK_CUSTOM_BRIEF, DEMO_PRESETS } from "@/data/presets";
 import { cn } from "@/lib/utils";
 
-const BRAND_TONES: BrandTone[] = ["Minimalist", "Bold", "Luxury", "Playful"];
-const PLATFORMS: Platform[] = ["Instagram", "LinkedIn", "Meta Ads"];
+const BRAND_TONES: BrandTone[] = ["Minimalist", "Bold", "Luxury"];
 
 interface CampaignBriefStudioProps {
   brief: CampaignBrief;
@@ -15,8 +14,6 @@ interface CampaignBriefStudioProps {
   onChangeBrief: (next: CampaignBrief) => void;
   onLaunch: () => void;
   onCancel: () => void;
-  mobileOpen?: boolean;
-  onCloseMobile?: () => void;
 }
 
 export function CampaignBriefStudio({
@@ -30,16 +27,7 @@ export function CampaignBriefStudio({
   const canLaunch =
     brief.productName.trim().length > 0 &&
     brief.productDescription.trim().length > 0 &&
-    brief.platforms.length > 0 &&
     !isRunning;
-
-  const togglePlatform = (platform: Platform) => {
-    const exists = brief.platforms.includes(platform);
-    const nextPlatforms = exists
-      ? brief.platforms.filter((p) => p !== platform)
-      : [...brief.platforms, platform];
-    onChangeBrief({ ...brief, platforms: nextPlatforms });
-  };
 
   const handleApplyPreset = (presetBrief: CampaignBrief) => {
     onChangeBrief({ ...presetBrief, platforms: [...presetBrief.platforms] });
@@ -53,31 +41,26 @@ export function CampaignBriefStudio({
   };
 
   return (
-    <div className="border-2 border-black bg-white p-5 shadow-[4px_4px_0px_#000000] sm:p-6">
+    <div className="border-2 border-black bg-white p-6 shadow-[4px_4px_0px_#000000]">
       <div className="flex items-center justify-between border-b-2 border-black pb-3">
-        <div className="flex items-center gap-2">
-          <span className="border border-black bg-[#10B981] px-1.5 py-0.5 font-mono text-[10px] font-black uppercase text-black">
-            01. BRIEF
-          </span>
-          <h2 className="font-display text-base font-black uppercase tracking-tight text-black">
-            Campaign Setup
-          </h2>
-        </div>
+        <h2 className="font-display text-base font-black uppercase tracking-tight text-black">
+          Define Your Campaign
+        </h2>
         <button
           type="button"
           disabled={isRunning}
           onClick={() => onChangeBrief(BLANK_CUSTOM_BRIEF)}
-          className="inline-flex items-center gap-1 font-mono text-[11px] font-bold text-black/60 hover:text-red-600 transition"
+          className="inline-flex items-center gap-1 font-mono text-[11px] font-bold text-black/50 hover:text-red-600 transition"
         >
           <RotateCcw className="h-3 w-3" />
           <span>Clear</span>
         </button>
       </div>
 
-      {/* 1-Click Starter Presets */}
+      {/* 1-Click Starter Blueprints */}
       <div className="mt-4">
-        <span className="block font-mono text-[10px] font-bold uppercase tracking-wider text-black/60">
-          Quick Starter Blueprints:
+        <span className="block font-mono text-[10px] font-bold uppercase tracking-wider text-black/50">
+          Or Choose A Blueprint:
         </span>
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           {DEMO_PRESETS.map((p) => {
@@ -89,7 +72,7 @@ export function CampaignBriefStudio({
                 disabled={isRunning}
                 onClick={() => handleApplyPreset(p.brief)}
                 className={cn(
-                  "border border-black px-2.5 py-1 font-mono text-xs font-bold transition",
+                  "border border-black px-3 py-1 font-mono text-xs font-bold transition",
                   isSelected
                     ? "bg-[#10B981] text-black shadow-[1px_1px_0px_#000000]"
                     : "bg-[#F3F4F6] text-black hover:bg-gray-200"
@@ -109,7 +92,7 @@ export function CampaignBriefStudio({
             htmlFor="productName"
             className="block font-mono text-xs font-bold uppercase text-black"
           >
-            Product / Brand Identifier *
+            Product Name *
           </label>
           <input
             id="productName"
@@ -120,24 +103,19 @@ export function CampaignBriefStudio({
             onChange={(e) =>
               onChangeBrief({ ...brief, productName: e.target.value })
             }
-            placeholder="e.g. Veloce Carbon Bike or AeroFlow AI"
-            className="mt-1 w-full border-2 border-black bg-white px-3 py-2 font-mono text-xs text-black placeholder-black/40 shadow-[2px_2px_0px_#000000] outline-none transition focus:bg-[#E6F7EB] disabled:bg-gray-100"
+            placeholder="e.g. LumaDrop Hydro or Veloce Carbon Bike"
+            className="mt-1 w-full border-2 border-black bg-white px-3 py-2.5 font-mono text-xs text-black placeholder-black/40 shadow-[2px_2px_0px_#000000] outline-none transition focus:bg-[#E6F7EB] disabled:bg-gray-100"
           />
         </div>
 
         {/* Product Description */}
         <div>
-          <div className="flex items-center justify-between">
-            <label
-              htmlFor="productDescription"
-              className="block font-mono text-xs font-bold uppercase text-black"
-            >
-              Creative Story &amp; Moat *
-            </label>
-            <span className="font-mono text-[10px] text-black/50">
-              {brief.productDescription.length} chars
-            </span>
-          </div>
+          <label
+            htmlFor="productDescription"
+            className="block font-mono text-xs font-bold uppercase text-black"
+          >
+            Description &amp; Key Features *
+          </label>
           <textarea
             id="productDescription"
             rows={3}
@@ -147,38 +125,17 @@ export function CampaignBriefStudio({
             onChange={(e) =>
               onChangeBrief({ ...brief, productDescription: e.target.value })
             }
-            placeholder="Describe unique features, target transformation, materials, and aesthetic vibe..."
+            placeholder="What does it do? Unique materials, benefits, and aesthetic vibe..."
             className="mt-1 w-full resize-none border-2 border-black bg-white px-3 py-2 font-mono text-xs leading-relaxed text-black placeholder-black/40 shadow-[2px_2px_0px_#000000] outline-none transition focus:bg-[#E6F7EB] disabled:bg-gray-100"
           />
         </div>
 
-        {/* Target Audience */}
-        <div>
-          <label
-            htmlFor="targetAudience"
-            className="block font-mono text-xs font-bold uppercase text-black"
-          >
-            Audience Segment
-          </label>
-          <input
-            id="targetAudience"
-            type="text"
-            disabled={isRunning}
-            value={brief.targetAudience}
-            onChange={(e) =>
-              onChangeBrief({ ...brief, targetAudience: e.target.value })
-            }
-            placeholder="e.g. Urban athletes, founders, luxury buyers"
-            className="mt-1 w-full border-2 border-black bg-white px-3 py-2 font-mono text-xs text-black placeholder-black/40 shadow-[2px_2px_0px_#000000] outline-none transition focus:bg-[#E6F7EB] disabled:bg-gray-100"
-          />
-        </div>
-
-        {/* Brand Tone Matrix */}
+        {/* Brand Tone Selector */}
         <div>
           <label className="block font-mono text-xs font-bold uppercase text-black">
-            Brand Tone Matrix
+            Brand Tone
           </label>
-          <div className="mt-1.5 grid grid-cols-4 gap-1">
+          <div className="mt-1.5 grid grid-cols-3 gap-1.5">
             {BRAND_TONES.map((tone) => {
               const active = brief.brandTone === tone;
               return (
@@ -188,42 +145,13 @@ export function CampaignBriefStudio({
                   disabled={isRunning}
                   onClick={() => onChangeBrief({ ...brief, brandTone: tone })}
                   className={cn(
-                    "border border-black py-1.5 font-mono text-[11px] font-bold uppercase transition",
+                    "border border-black py-1.5 font-mono text-xs font-bold uppercase transition",
                     active
                       ? "bg-[#10B981] font-black text-black shadow-[1px_1px_0px_#000000]"
                       : "bg-white text-black hover:bg-gray-100"
                   )}
                 >
                   {tone}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Distribution Channels */}
-        <div>
-          <label className="block font-mono text-xs font-bold uppercase text-black">
-            Channels
-          </label>
-          <div className="mt-1.5 grid grid-cols-3 gap-1.5">
-            {PLATFORMS.map((plat) => {
-              const active = brief.platforms.includes(plat);
-              return (
-                <button
-                  key={plat}
-                  type="button"
-                  disabled={isRunning}
-                  onClick={() => togglePlatform(plat)}
-                  className={cn(
-                    "flex items-center justify-between border border-black px-2.5 py-1.5 font-mono text-[11px] font-bold uppercase transition",
-                    active
-                      ? "bg-[#10B981] text-black shadow-[1px_1px_0px_#000000]"
-                      : "bg-white text-black hover:bg-gray-100"
-                  )}
-                >
-                  <span>{plat}</span>
-                  <span>{active ? "✓" : "+"}</span>
                 </button>
               );
             })}
@@ -237,10 +165,10 @@ export function CampaignBriefStudio({
               <button
                 type="button"
                 disabled
-                className="flex w-full items-center justify-center gap-2 border-2 border-black bg-[#FEF3C7] py-3 font-mono text-xs font-black uppercase text-black shadow-[3px_3px_0px_#000000]"
+                className="flex w-full items-center justify-center gap-2 border-2 border-black bg-[#FEF3C7] py-3.5 font-mono text-xs font-black uppercase text-black shadow-[3px_3px_0px_#000000]"
               >
                 <Loader2 className="h-4 w-4 animate-spin text-black" />
-                <span>AGENTS SYNTHESIZING...</span>
+                <span>SYNTHESIZING CAMPAIGN...</span>
               </button>
               <button
                 type="button"
@@ -254,7 +182,7 @@ export function CampaignBriefStudio({
             <button
               type="submit"
               disabled={!canLaunch}
-              className="inline-flex w-full items-center justify-center gap-2 border-2 border-black bg-[#10B981] py-3 font-mono text-xs font-black uppercase text-black shadow-[4px_4px_0px_#000000] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_#000000] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:opacity-50"
+              className="inline-flex w-full items-center justify-center gap-2 border-2 border-black bg-[#10B981] py-3.5 font-mono text-xs font-black uppercase text-black shadow-[4px_4px_0px_#000000] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_#000000] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:opacity-50"
             >
               <Sparkles className="h-4 w-4" />
               <span>GENERATE CAMPAIGN →</span>
