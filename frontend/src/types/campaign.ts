@@ -8,7 +8,10 @@ export type VideoShotStyle =
   | "luxury_editorial"
   | "pulse_drop"
   | "vox_collage"
-  | "ink_press";
+  | "ink_press"
+  | "cyberpunk_neon"
+  | "golden_hour_film"
+  | "titanium_minimal";
 
 export type VideoAspectRatio = "16:9" | "9:16";
 

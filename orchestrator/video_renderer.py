@@ -39,6 +39,9 @@ ShotStyle = Literal[
     "pulse_drop",
     "vox_collage",
     "ink_press",
+    "cyberpunk_neon",
+    "golden_hour_film",
+    "titanium_minimal",
 ]
 
 AspectRatio = Literal["16:9", "9:16"]
@@ -79,6 +82,24 @@ SHOT_STYLES: dict[str, dict[str, str]] = {
         "curve": "pressStamp · Swiss Grid",
         "source": "video-shotcraft",
         "description": "High-contrast Swiss print editorial, registration marks & tactile stamp hits",
+    },
+    "cyberpunk_neon": {
+        "label": "Cyberpunk Neon",
+        "curve": "anamorphicFlare · 2.39:1",
+        "source": "video-shotcraft",
+        "description": "Anamorphic cyan lens flare, noir shadows, neon magenta rim & sub-bass braams",
+    },
+    "golden_hour_film": {
+        "label": "Golden Hour 35mm",
+        "curve": "halationDrift · 3200K",
+        "source": "lemo-opuscar",
+        "description": "Kodak 2383 warm halation glow, floating dust motes, organic breath & 35mm grain",
+    },
+    "titanium_minimal": {
+        "label": "Titanium Keynote",
+        "curve": "specularGlide · 24fps",
+        "source": "bang-motion",
+        "description": "Apple-grade frosted slate, diagonal specular glint sweep, ice blue rim & studio acoustics",
     },
 }
 
@@ -422,6 +443,27 @@ def _synthesize_soundtrack_wav(
             (146.83, 220.00, 329.63),  # Dm9
             (110.00, 164.81, 329.63),  # A5 resolve
         ]
+    elif shot_style == "cyberpunk_neon":
+        chords = [
+            (110.00, 164.81, 220.00),  # Am cyberpunk dark
+            (123.47, 185.00, 246.94),  # Bm synth tension
+            (98.00, 146.83, 196.00),   # G power
+            (110.00, 146.83, 220.00),  # Dsus/A resolve
+        ]
+    elif shot_style == "golden_hour_film":
+        chords = [
+            (130.81, 164.81, 196.00),  # Cmaj warm nostalgia
+            (146.83, 174.61, 220.00),  # Dm7 gentle progression
+            (164.81, 196.00, 246.94),  # Em7 drift
+            (174.61, 220.00, 261.63),  # Fmaj7 lift
+        ]
+    elif shot_style == "titanium_minimal":
+        chords = [
+            (146.83, 220.00, 293.66),  # Dsus2 pristine
+            (164.81, 246.94, 329.63),  # Esus2 modern
+            (130.81, 196.00, 261.63),  # Csus2 minimal
+            (146.83, 220.00, 329.63),  # Dadd9 settle
+        ]
     else:
         chords = [
             (130.81, 196.00, 261.63),
@@ -431,7 +473,16 @@ def _synthesize_soundtrack_wav(
         ]
 
     beat_times = [0.0, duration_sec * 0.25, duration_sec * 0.53, duration_sec * 0.78]
-    bpm = 124.0 if shot_style == "pulse_drop" else (108.0 if shot_style in ("vox_collage", "ink_press") else 92.0)
+    if shot_style in ("pulse_drop", "cyberpunk_neon"):
+        bpm = 126.0
+    elif shot_style in ("vox_collage", "ink_press"):
+        bpm = 108.0
+    elif shot_style == "golden_hour_film":
+        bpm = 82.0
+    elif shot_style == "titanium_minimal":
+        bpm = 96.0
+    else:
+        bpm = 92.0
     beat_period = 60.0 / bpm
     two_pi = 2.0 * math.pi
     inv_sr = 1.0 / sample_rate
@@ -505,10 +556,22 @@ def _synthesize_soundtrack_wav(
                 hit_env = math.exp(-dt * 10.5)
                 sub_f = 95.0 * math.exp(-dt * 14.0) + 42.0
                 sub = math.sin(two_pi * sub_f * dt) * 0.28 * hit_env
-                chime_f = 523.25 if shot_style != "luxury_editorial" else 659.25
+                chime_f = 523.25 if shot_style not in ("luxury_editorial", "golden_hour_film") else 659.25
                 chime = math.sin(two_pi * chime_f * dt) * 0.14 * math.exp(-dt * 8.5)
-                left += sub + chime * 1.1
-                right += sub + chime * 0.9
+
+                if shot_style == "cyberpunk_neon":
+                    # Hans Zimmer sub braam (detuned Reese bass weight)
+                    braam = (math.sin(two_pi * 48.0 * dt) + 0.35 * math.sin(two_pi * 96.0 * dt)) * 0.36 * math.exp(-dt * 4.5)
+                    left += sub + chime * 1.1 + braam
+                    right += sub + chime * 0.9 + braam
+                elif shot_style == "titanium_minimal":
+                    # Precision low-frequency 42Hz tactile impulse
+                    drop = math.sin(two_pi * 42.0 * dt) * 0.32 * math.exp(-dt * 5.5)
+                    left += sub * 0.8 + drop
+                    right += sub * 0.8 + drop
+                else:
+                    left += sub + chime * 1.1
+                    right += sub + chime * 0.9
 
         l_s = int(max(-0.94, min(0.94, left * env)) * 32767)
         r_s = int(max(-0.94, min(0.94, right * env)) * 32767)
@@ -769,6 +832,160 @@ def _load_hero_images(paths: list[str], target_w: int, target_h: int) -> list[Im
     return loaded
 
 
+def _make_floating_cinematic_motes(count: int = 32, rng_seed: int = 42) -> list[dict[str, float]]:
+    """Deterministic 3D floating dust / bokeh particles (inspired by bang-motion & lemo-opuscar)."""
+    rng = random.Random(rng_seed)
+    motes = []
+    for _ in range(count):
+        motes.append(
+            {
+                "x": rng.random(),
+                "y": rng.random(),
+                "radius": rng.uniform(1.2, 3.4),
+                "vx": rng.uniform(-0.02, 0.02),
+                "vy": rng.uniform(-0.035, -0.01),
+                "alpha": rng.uniform(0.18, 0.52),
+                "depth": rng.uniform(0.4, 1.4),
+            }
+        )
+    return motes
+
+
+def _draw_floating_cinematic_motes(
+    canvas: Image.Image,
+    *,
+    motes: list[dict[str, float]],
+    t: float,
+    cam_x: float,
+    cam_y: float,
+    color_rgb: tuple[int, int, int],
+) -> None:
+    """Render moving dust/bokeh motes with multi-plane parallax depth."""
+    w, h = canvas.size
+    overlay = ImageDraw.Draw(canvas, "RGBA")
+    for m in motes:
+        px = ((m["x"] + m["vx"] * t + (cam_x / w) * m["depth"]) % 1.0) * w
+        py = ((m["y"] + m["vy"] * t + (cam_y / h) * m["depth"]) % 1.0) * h
+        r = m["radius"] * m["depth"]
+        flicker = 0.75 + 0.25 * math.sin(t * 3.2 + m["x"] * 12.0)
+        a = int(m["alpha"] * 255 * flicker)
+        overlay.ellipse(
+            (px - r, py - r, px + r, py + r),
+            fill=(*color_rgb, min(255, max(0, a))),
+        )
+
+
+def _draw_anamorphic_flare(
+    canvas: Image.Image,
+    *,
+    cx: float,
+    cy: float,
+    width: int,
+    color_rgb: tuple[int, int, int],
+    intensity: float,
+) -> None:
+    """Optical anamorphic horizontal streak flare on transition cuts (video-shotcraft & visual-skills)."""
+    if intensity <= 0.03:
+        return
+    flare_h = max(24, int(48 * intensity))
+    flare = Image.new("RGBA", (width, flare_h), (0, 0, 0, 0))
+    fd = ImageDraw.Draw(flare, "RGBA")
+    mid_y = flare_h // 2
+    alpha = int(min(255, max(0, intensity * 240)))
+
+    # Horizontal anamorphic laser beam
+    line_h = max(2, int(4 * intensity))
+    fd.rectangle(
+        (0, mid_y - line_h // 2, width, mid_y + line_h // 2),
+        fill=(*color_rgb, int(alpha * 0.72)),
+    )
+
+    # Hot white optical core
+    core_w = max(40, int(width * 0.26 * intensity))
+    fd.ellipse(
+        (cx - core_w // 2, mid_y - flare_h // 2, cx + core_w // 2, mid_y + flare_h // 2),
+        fill=(255, 255, 255, alpha),
+    )
+
+    # Diffuse colored halo
+    halo_w = max(80, int(width * 0.52 * intensity))
+    fd.ellipse(
+        (cx - halo_w // 2, mid_y - flare_h // 3, cx + halo_w // 2, mid_y + flare_h // 3),
+        fill=(*color_rgb, int(alpha * 0.45)),
+    )
+    blurred = flare.filter(ImageFilter.GaussianBlur(radius=max(1.0, 3.2 * intensity)))
+    canvas.paste(blurred, (0, int(cy - mid_y)), blurred)
+
+
+def _draw_cinematic_subtitles(
+    overlay: ImageDraw.ImageDraw,
+    *,
+    text: str,
+    width: int,
+    height: int,
+    pad: int,
+    font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+    text_rgb: tuple[int, int, int],
+    bg_rgb: tuple[int, int, int],
+    is_light_ground: bool,
+    alpha: int,
+) -> None:
+    """Lower-third synced subtitle caption plate (openshorts & vox-director)."""
+    if alpha <= 4 or not text:
+        return
+    cleaned = text.strip()
+    if len(cleaned) > 85:
+        cleaned = cleaned[:82] + "..."
+    bbox = overlay.textbbox((0, 0), cleaned, font=font)
+    tw = bbox[2] - bbox[0]
+    th = bbox[3] - bbox[1]
+    sub_x = (width - tw) // 2
+    sub_y = height - pad - 44
+    pill_pad_x = 18
+    pill_pad_y = 6
+
+    overlay.rounded_rectangle(
+        (sub_x - pill_pad_x, sub_y - pill_pad_y, sub_x + tw + pill_pad_x, sub_y + th + pill_pad_y),
+        radius=8,
+        fill=(0, 0, 0, int(alpha * 0.70)) if not is_light_ground else (255, 255, 255, int(alpha * 0.88)),
+        outline=(255, 255, 255, int(alpha * 0.28)) if not is_light_ground else (24, 24, 27, int(alpha * 0.28)),
+        width=1,
+    )
+    overlay.text((sub_x, sub_y), cleaned, font=font, fill=(*text_rgb, alpha))
+
+
+def _draw_camera_gate_telemetry(
+    overlay: ImageDraw.ImageDraw,
+    *,
+    width: int,
+    height: int,
+    pad: int,
+    font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+    accent_rgb: tuple[int, int, int],
+    shot_style: ShotStyle,
+    is_light_ground: bool,
+) -> None:
+    """Cinematic film gate brackets ⌜ ⌝ ⌞ ⌟ & lens telemetry (video-shotcraft / visual-skills)."""
+    bracket_len = 16
+    col = (*accent_rgb, 140) if not is_light_ground else (24, 24, 27, 130)
+
+    x0, y0 = pad + 8, pad + 8
+    x1, y1 = width - pad - 8, height - pad - 8
+
+    # Top-Left ⌜
+    overlay.line((x0, y0, x0 + bracket_len, y0), fill=col, width=2)
+    overlay.line((x0, y0, x0, y0 + bracket_len), fill=col, width=2)
+    # Top-Right ⌝
+    overlay.line((x1, y0, x1 - bracket_len, y0), fill=col, width=2)
+    overlay.line((x1, y0, x1, y0 + bracket_len), fill=col, width=2)
+    # Bottom-Left ⌞
+    overlay.line((x0, y1, x0 + bracket_len, y1), fill=col, width=2)
+    overlay.line((x0, y1, x0, y1 - bracket_len), fill=col, width=2)
+    # Bottom-Right ⌟
+    overlay.line((x1, y1, x1 - bracket_len, y1), fill=col, width=2)
+    overlay.line((x1, y1, x1, y1 - bracket_len), fill=col, width=2)
+
+
 def _paste_ken_burns_hero_card(
     canvas: Image.Image,
     hero_img: Image.Image,
@@ -793,7 +1010,20 @@ def _paste_ken_burns_hero_card(
     cropped = hero_img.crop((pan_x, pan_y, pan_x + crop_w, pan_y + crop_h))
     resized = cropped.resize((card_w, card_h), Image.Resampling.BILINEAR)
 
-    # Rounded mask (or crisp torn/paper border for Vox Collage / Ink Press)
+    # Specular studio glint sweep in Beat 2 (video-shotcraft & bang-motion)
+    if 0.22 <= progress <= 0.62:
+        glint_t = (progress - 0.22) / 0.40
+        glint_overlay = Image.new("RGBA", (card_w, card_h), (0, 0, 0, 0))
+        gd = ImageDraw.Draw(glint_overlay, "RGBA")
+        gx = int(-card_w * 0.45 + glint_t * card_w * 1.9)
+        band_w = max(28, int(card_w * 0.24))
+        gd.polygon(
+            [(gx, 0), (gx + band_w, 0), (gx + band_w - card_h * 0.45, card_h), (gx - card_h * 0.45, card_h)],
+            fill=(255, 255, 255, int(50 * math.sin(glint_t * math.pi))),
+        )
+        resized = Image.alpha_composite(resized.convert("RGBA"), glint_overlay)
+
+    # Rounded mask (or crisp torn/paper border for Vox Collage / Ink Press / Cyberpunk)
     pad = 12 if shot_style == "vox_collage" else (6 if shot_style == "ink_press" else 4)
     framed_w = card_w + pad * 2
     framed_h = card_h + pad * 2
@@ -813,6 +1043,30 @@ def _paste_ken_burns_hero_card(
     elif shot_style == "ink_press":
         cd.rectangle((0, 0, framed_w - 1, framed_h - 1), fill=(24, 24, 27, 255), outline=(24, 24, 27, 255), width=2)
         card.paste(resized, (pad, pad))
+    elif shot_style == "cyberpunk_neon":
+        mask = Image.new("L", (card_w, card_h), 0)
+        md = ImageDraw.Draw(mask)
+        md.rounded_rectangle((0, 0, card_w, card_h), radius=14, fill=255)
+        cd.rounded_rectangle(
+            (0, 0, framed_w - 1, framed_h - 1),
+            radius=18,
+            fill=(10, 11, 16, 240),
+            outline=(0, 240, 255, 225),
+            width=2,
+        )
+        card.paste(resized, (pad, pad), mask)
+    elif shot_style == "golden_hour_film":
+        mask = Image.new("L", (card_w, card_h), 0)
+        md = ImageDraw.Draw(mask)
+        md.rounded_rectangle((0, 0, card_w, card_h), radius=12, fill=255)
+        cd.rounded_rectangle(
+            (0, 0, framed_w - 1, framed_h - 1),
+            radius=15,
+            fill=(24, 18, 12, 235),
+            outline=(245, 158, 11, 210),
+            width=2,
+        )
+        card.paste(resized, (pad, pad), mask)
     else:
         mask = Image.new("L", (card_w, card_h), 0)
         md = ImageDraw.Draw(mask)
@@ -864,6 +1118,8 @@ def _render_frame(
     text_rgb: tuple[int, int, int],
     muted_rgb: tuple[int, int, int],
     is_light_ground: bool,
+    motes: list[dict[str, float]] | None = None,
+    voiceover_beats: list[dict[str, str]] | None = None,
 ) -> bytes:
     """Render one 24fps frame of the continuous motion-graphics studio world."""
     is_vertical = height > width
@@ -873,7 +1129,7 @@ def _render_frame(
 
     cam_x = math.sin(progress * math.pi * 2.0) * (width * 0.04)
     cam_y = math.cos(progress * math.pi * 1.5) * (height * 0.025)
-    bpm_period = 60.0 / (124.0 if spec.shot_style == "pulse_drop" else 100.0)
+    bpm_period = 60.0 / (124.0 if spec.shot_style in ("pulse_drop", "cyberpunk_neon") else 100.0)
     beat_pulse = math.exp(-((t % bpm_period) * 5.2))
 
     # 1. Volumetric Moving Studio Halos (dark/cinematic modes) or Editorial Paper Wash
@@ -888,9 +1144,25 @@ def _render_frame(
         halo2_y = int(height * (0.78 - 0.12 * progress) - cam_y - gh2 / 2)
         img.paste(glow_accent, (halo2_x, halo2_y), glow_accent)
 
+        # 1b. Floating 3D Cinematic Bokeh / Dust Motes (bang-motion / lemo-opuscar)
+        if motes:
+            motes_col = (
+                (0, 240, 255) if spec.shot_style == "cyberpunk_neon" else (
+                    (251, 191, 36) if spec.shot_style == "golden_hour_film" else accent_rgb
+                )
+            )
+            _draw_floating_cinematic_motes(
+                img,
+                motes=motes,
+                t=t,
+                cam_x=cam_x,
+                cam_y=cam_y,
+                color_rgb=motes_col,
+            )
+
     overlay = ImageDraw.Draw(img, "RGBA")
 
-    # 2. Architectural Frame, Registration Marks (Ink Press) & Telemetry Bar
+    # 2. Architectural Frame, Registration Marks & Film Gate Telemetry
     pad = int(min(width, height) * 0.045)
     border_col = (24, 24, 27, 65) if is_light_ground else (255, 255, 255, 34)
     divider_col = (24, 24, 27, 38) if is_light_ground else (255, 255, 255, 24)
@@ -908,6 +1180,18 @@ def _render_frame(
             outline=border_col,
             width=2 if spec.shot_style == "vox_collage" else 1,
         )
+        # Film gate corner indicators ⌜ ⌝ ⌞ ⌟
+        if spec.shot_style in ("obsidian_cinema", "cyberpunk_neon", "golden_hour_film", "titanium_minimal", "luxury_editorial"):
+            _draw_camera_gate_telemetry(
+                overlay,
+                width=width,
+                height=height,
+                pad=pad,
+                font=fonts["mono_xs"],
+                accent_rgb=accent_rgb,
+                shot_style=spec.shot_style,
+                is_light_ground=is_light_ground,
+            )
 
     top_bar_y = pad + 44
     overlay.line((pad, top_bar_y, width - pad, top_bar_y), fill=divider_col, width=1)
@@ -967,6 +1251,28 @@ def _render_frame(
     b1 = duration * 0.25
     b2 = duration * 0.53
     b3 = duration * 0.78
+
+    # Optical Anamorphic Horizontal Flare on beat transitions
+    if not is_light_ground:
+        for bt in (0.0, b1, b2, b3):
+            dt = t - bt
+            if 0.0 <= dt < 0.38:
+                flare_i = math.exp(-dt * 9.5)
+                flare_col = (
+                    (0, 240, 255) if spec.shot_style == "cyberpunk_neon" else (
+                        (251, 191, 36) if spec.shot_style == "golden_hour_film" else (
+                            (56, 189, 248) if spec.shot_style == "titanium_minimal" else accent_rgb
+                        )
+                    )
+                )
+                _draw_anamorphic_flare(
+                    img,
+                    cx=width * 0.5 + cam_x,
+                    cy=height * 0.48 + cam_y,
+                    width=width,
+                    color_rgb=flare_col,
+                    intensity=flare_i,
+                )
 
     # 3. Persistent Hero Subject: Real Generated Gemini Image (Ken Burns) OR Sculptural Monolith
     end_shift = ease_whip_push((t - (b3 - 0.25)) / 0.85)
@@ -1232,6 +1538,26 @@ def _render_frame(
             fill=(255, 255, 255, alpha),
         )
 
+    # 4b. Synced Lower-Third Voiceover Subtitles (openshorts & vox-director)
+    if spec.enable_voiceover and spec.voice != "none" and voiceover_beats:
+        active_idx = min(len(voiceover_beats) - 1, int(t / (duration * 0.25)))
+        active_text = voiceover_beats[active_idx].get("text", "")
+        local_bt = t - (active_idx * (duration * 0.25))
+        seg_d = duration * 0.25
+        sub_fade = min(1.0, local_bt / 0.18) * max(0.0, min(1.0, (seg_d - local_bt) / 0.22))
+        _draw_cinematic_subtitles(
+            overlay,
+            text=active_text,
+            width=width,
+            height=height,
+            pad=pad,
+            font=fonts["body"],
+            text_rgb=text_rgb,
+            bg_rgb=bg_rgb,
+            is_light_ground=is_light_ground,
+            alpha=int(235 * sub_fade),
+        )
+
     # 5. Bottom Progress Timeline Bar + Beat Notch Markers
     bar_y = height - pad - 14
     bar_x0 = pad + 18
@@ -1285,6 +1611,24 @@ def render_campaign_video_mp4(spec: VideoRenderSpec, output_path: Path) -> Path:
         accent_rgb = _hex_to_rgb(palette[1], (225, 29, 72))
         text_rgb = (18, 18, 21)
         muted_rgb = (82, 82, 91)
+    elif spec.shot_style == "cyberpunk_neon":
+        bg_rgb = (10, 11, 16)  # Dark cyber noir
+        primary_rgb = (0, 240, 255)  # Neon cyan
+        accent_rgb = (255, 0, 127)  # Electric magenta
+        text_rgb = (255, 255, 255)
+        muted_rgb = (148, 163, 184)
+    elif spec.shot_style == "golden_hour_film":
+        bg_rgb = (18, 14, 11)  # Warm tungsten shadow
+        primary_rgb = (245, 158, 11)  # Warm amber 3200K
+        accent_rgb = (251, 191, 36)  # Sunburst gold
+        text_rgb = (254, 243, 199)  # Cream white
+        muted_rgb = (217, 119, 6)
+    elif spec.shot_style == "titanium_minimal":
+        bg_rgb = (15, 23, 42)  # Slate 900
+        primary_rgb = (226, 232, 240)  # Frosted titanium slate 200
+        accent_rgb = (56, 189, 248)  # Ice sky 400
+        text_rgb = (255, 255, 255)
+        muted_rgb = (148, 163, 184)
     else:
         bg_rgb = _hex_to_rgb(palette[0], (9, 9, 12))
         if sum(bg_rgb) > 120:
@@ -1330,6 +1674,8 @@ def render_campaign_video_mp4(spec: VideoRenderSpec, output_path: Path) -> Path:
     glow_accent = _make_glow_sprite(int(glow_size * 0.9), accent_rgb, 95)
     vignette = _make_vignette_overlay(width, height, strength=65 if is_light_ground else 135)
     grain_tiles = _make_film_grain_tiles(width, height, count=3)
+    cinematic_motes = _make_floating_cinematic_motes(count=28)
+    vo_beats = build_voiceover_beats(spec) if spec.enable_voiceover else []
 
     card_target_w = int(width * (0.72 if height > width else 0.34))
     card_target_h = int(card_target_w * 0.7)
@@ -1465,6 +1811,8 @@ def render_campaign_video_mp4(spec: VideoRenderSpec, output_path: Path) -> Path:
                     text_rgb=text_rgb,
                     muted_rgb=muted_rgb,
                     is_light_ground=is_light_ground,
+                    motes=cinematic_motes,
+                    voiceover_beats=vo_beats,
                 )
                 proc.stdin.write(raw)
             proc.stdin.flush()

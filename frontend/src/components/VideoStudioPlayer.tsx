@@ -71,6 +71,24 @@ const SHOT_RECIPES: {
     curve: "pressStamp · Swiss",
     tag: "video-shotcraft",
   },
+  {
+    id: "cyberpunk_neon",
+    label: "Cyberpunk Neon",
+    curve: "anamorphic · 2.39:1",
+    tag: "video-shotcraft",
+  },
+  {
+    id: "golden_hour_film",
+    label: "Golden Hour 35mm",
+    curve: "halation · 3200K",
+    tag: "lemo-opuscar",
+  },
+  {
+    id: "titanium_minimal",
+    label: "Titanium Keynote",
+    curve: "specular · 24fps",
+    tag: "bang-motion",
+  },
 ];
 
 const DIRECTOR_BEATS = [
@@ -324,6 +342,56 @@ export function VideoStudioPlayer({
       const snippet = brief.productDescription.slice(0, 60) + (brief.productDescription.length > 60 ? "…" : "");
       ctx.fillText(snippet, width / 2, height * 0.62);
 
+      // Film Gate Corner Brackets ⌜ ⌝ ⌞ ⌟
+      const pad = Math.round(width * 0.04);
+      const bLen = 14;
+      ctx.strokeStyle = "rgba(16, 185, 129, 0.4)";
+      ctx.lineWidth = 1.5;
+      // Top-Left
+      ctx.beginPath();
+      ctx.moveTo(pad, pad + bLen); ctx.lineTo(pad, pad); ctx.lineTo(pad + bLen, pad);
+      // Top-Right
+      ctx.moveTo(width - pad - bLen, pad); ctx.lineTo(width - pad, pad); ctx.lineTo(width - pad, pad + bLen);
+      // Bottom-Left
+      ctx.moveTo(pad, height - pad - bLen); ctx.lineTo(pad, height - pad); ctx.lineTo(pad + bLen, height - pad);
+      // Bottom-Right
+      ctx.moveTo(width - pad - bLen, height - pad); ctx.lineTo(width - pad, height - pad); ctx.lineTo(width - pad, height - pad - bLen);
+      ctx.stroke();
+
+      // Optical Anamorphic Streak on Beat Transitions
+      const localBeatProgress = (progress * DIRECTOR_BEATS.length) % 1;
+      if (localBeatProgress < 0.22) {
+        const flareIntensity = 1 - localBeatProgress / 0.22;
+        ctx.save();
+        ctx.strokeStyle = "rgba(0, 240, 255, " + (flareIntensity * 0.7).toFixed(2) + ")";
+        ctx.lineWidth = 2 * flareIntensity;
+        ctx.beginPath();
+        ctx.moveTo(0, height * 0.52);
+        ctx.lineTo(width, height * 0.52);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Voiceover Subtitle Caption Pill
+      if (enableVoiceover) {
+        ctx.save();
+        const voSnippet = effectiveScript.slice(0, 75);
+        ctx.font = `500 ${Math.round(height * 0.026)}px 'Hanken Grotesk', sans-serif`;
+        const metrics = ctx.measureText(voSnippet);
+        const pillW = metrics.width + 24;
+        const pillH = Math.round(height * 0.044);
+        ctx.fillStyle = "rgba(0,0,0,0.65)";
+        ctx.strokeStyle = "rgba(255,255,255,0.2)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect((width - pillW) / 2, height - pad - 36, pillW, pillH, 6);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillText(voSnippet, width / 2, height - pad - 36 + pillH / 2);
+        ctx.restore();
+      }
+
       // Progress Tracker Bar at Bottom
       ctx.fillStyle = "rgba(255,255,255,0.2)";
       ctx.fillRect(0, height - 6, width, 6);
@@ -336,7 +404,7 @@ export function VideoStudioPlayer({
         animFrameRef.current = requestAnimationFrame(drawFrame);
       }
     },
-    [brief, isPlayingCanvas]
+    [brief, isPlayingCanvas, effectiveScript, enableVoiceover]
   );
 
   useEffect(() => {
