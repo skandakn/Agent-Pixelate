@@ -120,8 +120,13 @@ export async function exportCampaignZip(assets: CampaignAssets): Promise<void> {
           const resp = await fetch(creative.imageUrl);
           if (resp.ok) {
             const bytes = await resp.arrayBuffer();
+            const ext = creative.imageUrl.includes(".png")
+              ? "png"
+              : creative.imageUrl.includes(".svg")
+                ? "svg"
+                : "jpg";
             creativesFolder.file(
-              `0${idx + 1}-${slugify(creative.title)}.svg`,
+              `0${idx + 1}-${slugify(creative.title)}.${ext}`,
               bytes
             );
           }

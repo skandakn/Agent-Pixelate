@@ -55,7 +55,7 @@ function InteractiveThreeDGateView({
       <div className="absolute inset-0">
         <ThreeDashboardScene
           focusTarget="overview"
-          onSelectNode={() => {}}
+          onSelectNode={() => { }}
           geminiEnabled={geminiEnabled}
         />
       </div>

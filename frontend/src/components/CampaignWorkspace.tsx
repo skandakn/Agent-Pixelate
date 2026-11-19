@@ -299,23 +299,38 @@ export function CampaignWorkspace() {
                   </h3>
                 </div>
 
-                {/* Aspect Switcher */}
-                <div className="flex gap-1.5">
-                  {(["1:1", "9:16", "16:9"] as const).map((aspect) => (
-                    <button
-                      key={aspect}
-                      type="button"
-                      onClick={() => setSelectedAspect(aspect)}
-                      className={cn(
-                        "border border-black px-2.5 py-1 font-mono text-xs font-bold uppercase transition",
-                        selectedAspect === aspect
-                          ? "bg-[#10B981] font-black text-black shadow-[1px_1px_0px_#000000]"
-                          : "bg-white text-black hover:bg-gray-100"
-                      )}
+                {/* Aspect Switcher & Save Button */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex gap-1.5">
+                    {(["1:1", "9:16", "16:9"] as const).map((aspect) => (
+                      <button
+                        key={aspect}
+                        type="button"
+                        onClick={() => setSelectedAspect(aspect)}
+                        className={cn(
+                          "border border-black px-2.5 py-1 font-mono text-xs font-bold uppercase transition",
+                          selectedAspect === aspect
+                            ? "bg-[#10B981] font-black text-black shadow-[1px_1px_0px_#000000]"
+                            : "bg-white text-black hover:bg-gray-100"
+                        )}
+                      >
+                        {aspect}
+                      </button>
+                    ))}
+                  </div>
+
+                  {activeCreative?.imageUrl && (
+                    <a
+                      href={activeCreative.imageUrl}
+                      download={`${brief.productName.toLowerCase().replace(/\s+/g, "-")}-${selectedAspect}.jpg`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 border border-black bg-white px-2.5 py-1 font-mono text-[11px] font-bold uppercase text-black shadow-[1px_1px_0px_#000000] hover:bg-gray-50"
                     >
-                      {aspect}
-                    </button>
-                  ))}
+                      <Download className="h-3 w-3" />
+                      <span>Save Image</span>
+                    </a>
+                  )}
                 </div>
               </div>
 
