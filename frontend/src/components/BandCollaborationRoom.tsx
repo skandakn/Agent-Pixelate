@@ -152,22 +152,28 @@ export function BandCollaborationRoom({
     setMemoryContent("");
   };
 
-  const visibleMessages = useMemo(() => events.slice(-45), [events]);
+  const visibleMessages = useMemo(() => (events || []).slice(-45), [events]);
+
+  const participantsList = Array.isArray(roomState?.participants) ? roomState.participants : [];
+  const policiesList = Array.isArray(roomState?.policies) ? roomState.policies : [];
+  const memoriesList = Array.isArray(roomState?.memories) ? roomState.memories : [];
+  const brandMemoriesList = Array.isArray(roomState?.brandMemories) ? roomState.brandMemories : [];
+  const executionsList = Array.isArray(roomState?.executions) ? roomState.executions : [];
+  const focusWindowsList = Array.isArray(roomState?.focusWindows) ? roomState.focusWindows : [];
+  const delegationsList = Array.isArray(roomState?.delegations) ? roomState.delegations : [];
 
   const activeFocusWindow = useMemo(() => {
+    const list = Array.isArray(roomState?.focusWindows) ? roomState.focusWindows : [];
     return (
-      roomState.focusWindows.find((w) => w.agentHandle === selectedFocusHandle) ??
-      roomState.focusWindows[0] ??
+      list.find((w) => w.agentHandle === selectedFocusHandle) ??
+      list[0] ??
       null
     );
-  }, [roomState.focusWindows, selectedFocusHandle]);
+  }, [roomState?.focusWindows, selectedFocusHandle]);
 
-  const hopRatioPct = Math.min(
-    100,
-    Math.round(
-      (roomState.loopGuard.currentHops / Math.max(1, roomState.loopGuard.maxAgentHops)) * 100
-    )
-  );
+  const maxHops = Math.max(1, roomState?.loopGuard?.maxAgentHops ?? 6);
+  const currentHops = roomState?.loopGuard?.currentHops ?? 0;
+  const hopRatioPct = Math.min(100, Math.round((currentHops / maxHops) * 100));
 
   return (
     <section className="overflow-hidden border-2 border-black bg-white shadow-[4px_4px_0px_#000000]">
@@ -183,9 +189,9 @@ export function BandCollaborationRoom({
                 BAND SHARED ROOM &amp; AGENTIC CONTROL PLANE
               </h3>
               <span className="border border-black bg-white px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-black">
-                {roomState.roomId}
+                {roomState?.roomId || "BAND ROOM"}
               </span>
-              {roomState.criticReport && (
+              {roomState?.criticReport && (
                 <span className="border border-black bg-[#10B981] px-2 py-0.5 font-mono text-[10px] font-black uppercase text-black">
                   QA {roomState.criticReport.overallScore}/100 ({roomState.criticReport.grade})
                 </span>
@@ -204,12 +210,12 @@ export function BandCollaborationRoom({
               { id: "chat", label: `ROOM (${visibleMessages.length})`, icon: MessageSquare },
               {
                 id: "memory",
-                label: `MEMORY (${roomState.memories.length + roomState.brandMemories.length})`,
+                label: `MEMORY (${memoriesList.length + brandMemoriesList.length})`,
                 icon: Database,
               },
               {
                 id: "executions",
-                label: `FOCUS (${roomState.executions.length})`,
+                label: `FOCUS (${executionsList.length})`,
                 icon: Cpu,
               },
               { id: "control", label: "CONTROL", icon: Shield },
@@ -240,8 +246,8 @@ export function BandCollaborationRoom({
       {/* Live 5-Participant Agentic Mesh Roster */}
       <div className="border-b border-black/[0.06] bg-[#FBFBFD] px-6 py-3">
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
-          {roomState.participants.map((p) => {
-            const policy = roomState.policies.find((pol) => pol.handle === p.handle);
+          {participantsList.map((p) => {
+            const policy = policiesList.find((pol) => pol.handle === p.handle);
             const isMuted = Boolean(policy?.muted);
             const dotColor = isMuted
               ? "bg-[#D2D2D7]"
@@ -489,19 +495,19 @@ export function BandCollaborationRoom({
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
               <span className="text-[12px] font-semibold tracking-[-0.01em] text-[#1D1D1F]">
-                Active Room Memories ({roomState.memories.length})
+                Active Room Memories ({memoriesList.length})
               </span>
               <span className="text-[11px] text-[#6E6E73]">
-                Promote any rule to persist across all future {roomState.brandName || "brand"} rooms
+                Promote any rule to persist across all future {roomState?.brandName || "brand"} rooms
               </span>
             </div>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {roomState.memories.length === 0 ? (
+              {memoriesList.length === 0 ? (
                 <div className="col-span-full rounded-2xl border border-dashed border-black/[0.1] bg-white p-6 text-center text-[13px] text-[#86868B]">
                   Pin a brand guardrail below to populate Shared BAND Memory.
                 </div>
               ) : (
-                roomState.memories.map((mem) => {
+                memoriesList.map((mem) => {
                   const isPromoted = Boolean(promotedIds[mem.memoryId]);
                   return (
                     <div
@@ -560,14 +566,14 @@ export function BandCollaborationRoom({
           </div>
 
           {/* Cross-Session Brand Memories */}
-          {roomState.brandMemories.length > 0 && (
+          {brandMemoriesList.length > 0 && (
             <div className="space-y-2.5">
               <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[#1D1D1F]">
                 <CheckCircle2 className="h-3.5 w-3.5 text-[#248A3D]" />
-                Cross-Session Brand Vault — {roomState.brandName} ({roomState.brandMemories.length})
+                Cross-Session Brand Vault — {roomState?.brandName || "Brand"} ({brandMemoriesList.length})
               </span>
               <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
-                {roomState.brandMemories.map((bm) => (
+                {brandMemoriesList.map((bm) => (
                   <div
                     key={bm.memoryId}
                     className="rounded-2xl border border-[#0071E3]/20 bg-[#0071E3]/[0.04] p-3.5"
@@ -721,15 +727,15 @@ export function BandCollaborationRoom({
           <div className="space-y-3">
             <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[#1D1D1F]">
               <Activity className="h-3.5 w-3.5 text-[#0071E3]" />
-              Context-Isolated Task Executions ({roomState.executions.length})
+              Context-Isolated Task Executions ({executionsList.length})
             </span>
 
-            {roomState.executions.length === 0 ? (
+            {executionsList.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-black/[0.1] bg-white p-6 text-center text-[13px] text-[#86868B]">
                 Execution traces &amp; tool calls will stream here as agents run.
               </div>
             ) : (
-              roomState.executions.map((ex) => (
+              executionsList.map((ex) => (
                 <div
                   key={ex.executionId}
                   className="rounded-2xl border border-black/[0.06] bg-white p-4 shadow-sm"
@@ -998,7 +1004,7 @@ export function BandCollaborationRoom({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-black/[0.05]">
-                  {roomState.policies.map((pol) => (
+                  {policiesList.map((pol) => (
                     <tr key={pol.handle}>
                       <td className="py-2.5 pr-3 font-mono text-[11px] font-semibold text-[#1D1D1F]">
                         {pol.handle}
@@ -1066,13 +1072,13 @@ export function BandCollaborationRoom({
           </div>
 
           {/* Delegation Ledger Summary */}
-          {roomState.delegations.length > 0 && (
+          {delegationsList.length > 0 && (
             <div className="space-y-2">
               <span className="text-[12px] font-semibold text-[#1D1D1F]">
-                Delegation Chain ({roomState.delegations.length})
+                Delegation Chain ({delegationsList.length})
               </span>
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                {roomState.delegations.map((edge) => (
+                {delegationsList.map((edge) => (
                   <div
                     key={edge.edgeId}
                     className="flex items-center justify-between gap-2 rounded-2xl border border-black/[0.06] bg-white px-3.5 py-2.5 text-[11px]"

@@ -1419,7 +1419,93 @@ class CampaignCoordinator:
                     mime = str(inline.get("mimeType") or inline.get("mime_type") or "image/png")
                     return raw_bytes, mime
         except Exception as exc:
-            logger.warning("Gemini image generation failed (%s); using studio SVG.", exc)
+            logger.warning("Gemini image generation failed (%s); using studio photo.", exc)
+        return None
+
+    async def _get_product_photo_bytes(
+        self, product_name: str, product_description: str, idx: int
+    ) -> tuple[bytes, str] | None:
+        """Fetch a real, high-resolution commercial product photo tailored to the product description."""
+        if os.environ.get("PYTEST_CURRENT_TEST") or self._http is None:
+            return None
+
+        haystack = f"{product_name} {product_description}".lower()
+        if any(k in haystack for k in ("bottle", "hydro", "water", "flask", "tumbler", "drinkware", "hydration")):
+            urls = [
+                "https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1523362628745-0c100150b504?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1589365278144-c9e705f843ba?auto=format&fit=crop&w=1200&q=80",
+            ]
+        elif any(k in haystack for k in ("earbud", "audio", "noise", "headphone", "sound", "acoustic", "pod", "aether")):
+            urls = [
+                "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1572536147248-ac59a8abfa4b?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1546435770-a3e426bf472b?auto=format&fit=crop&w=1200&q=80",
+            ]
+        elif any(k in haystack for k in ("matcha", "tea", "kyoto", "ceremonial", "kuroha", "whisk", "chasen")):
+            urls = [
+                "https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1515823662273-ad9525e58846?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1582793988951-9aed5509eb97?auto=format&fit=crop&w=1200&q=80",
+            ]
+        elif any(k in haystack for k in ("watch", "ring", "wearable", "biometric", "tracker", "smartwatch")):
+            urls = [
+                "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1546868871-7041f2a55e12?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1510519138197-06b8628cbf47?auto=format&fit=crop&w=1200&q=80",
+            ]
+        elif any(k in haystack for k in ("serum", "cream", "skin", "cosmetic", "perfume", "beauty", "fragrance")):
+            urls = [
+                "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1571781926291-c477ebfd024b?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?auto=format&fit=crop&w=1200&q=80",
+            ]
+        elif any(k in haystack for k in ("coffee", "espresso", "roast", "beans", "brew", "cafe")):
+            urls = [
+                "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1517256064527-09c73fc73e38?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&q=80",
+            ]
+        elif any(k in haystack for k in ("shoe", "sneaker", "footwear", "apparel", "jacket", "hoodie")):
+            urls = [
+                "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1552346154-21d32810aba3?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1607522370275-f14206abe5d3?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1515955656352-a1fa3ffcd111?auto=format&fit=crop&w=1200&q=80",
+            ]
+        elif any(k in haystack for k in ("keyboard", "mouse", "laptop", "computer", "desk", "monitor")):
+            urls = [
+                "https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1595225476474-87563907a212?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1526738549149-8e07eca6c147?auto=format&fit=crop&w=1200&q=80",
+            ]
+        else:
+            urls = [
+                "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1200&q=80",
+                "https://images.unsplash.com/photo-1510519138197-06b8628cbf47?auto=format&fit=crop&w=1200&q=80",
+            ]
+
+        target_url = urls[idx % len(urls)]
+        try:
+            resp = await self._http.get(
+                target_url,
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=4.0,
+                follow_redirects=True,
+            )
+            if resp.status_code == 200 and len(resp.content) > 1000:
+                return resp.content, "image/jpeg"
+        except Exception as exc:
+            logger.warning("Curated product photo fetch failed (%s); using studio render.", exc)
         return None
 
     async def _synthesize_fallback_visual(
@@ -1494,6 +1580,11 @@ class CampaignCoordinator:
 
             # Try real Gemini Flash Image generation first when GEMINI_API_KEY is active
             img_result = await self._gemini_generate_image(prompt_used)
+            if img_result is None:
+                img_result = await self._get_product_photo_bytes(
+                    req.brand_name, req.product_description, idx
+                )
+
             if img_result is not None:
                 img_bytes, mime_type = img_result
                 ext = "jpg" if "jpeg" in mime_type or "jpg" in mime_type else "png"

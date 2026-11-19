@@ -20,12 +20,27 @@ import {
   Sparkles,
   UserPlus,
 } from "lucide-react";
-import {
-  CameraFocusTarget,
-  ThreeDashboardScene,
-} from "@/components/ThreeDashboardScene";
+import dynamic from "next/dynamic";
+import type { CameraFocusTarget } from "@/components/ThreeDashboardScene";
 import { useRuntimeAuthConfig } from "@/components/ClerkAuthProvider";
 import { CampaignWorkspace } from "@/components/CampaignWorkspace";
+
+const ThreeDashboardScene = dynamic(
+  () =>
+    import("@/components/ThreeDashboardScene").then(
+      (mod) => mod.ThreeDashboardScene
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full w-full items-center justify-center bg-[#09090b] text-violet-400">
+        <span className="font-mono text-xs tracking-wider animate-pulse">
+          INITIALIZING 3D NEURAL MESH...
+        </span>
+      </div>
+    ),
+  }
+);
 
 const NODE_DETAILS: Record<
   CameraFocusTarget,

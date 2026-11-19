@@ -207,6 +207,18 @@ export interface ColorSwatch {
   role: string;
 }
 
+export type VisualStyle = "studio" | "lifestyle" | "macro" | "editorial";
+
+export interface VisualOption {
+  id: string;
+  label: string;
+  style: VisualStyle;
+  imageUrl: string;
+  description: string;
+  lighting?: string;
+  composition?: string;
+}
+
 export interface VisualCreative {
   id: string;
   title: string;
@@ -220,6 +232,7 @@ export interface VisualCreative {
   composition: string;
   artNote: string;
   promptSummary: string;
+  options?: VisualOption[];
 }
 
 export interface StoryboardFrame {
