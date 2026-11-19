@@ -5,6 +5,7 @@ import {
   Download,
   FileJson,
   PanelLeft,
+  Plus,
   Sparkles,
   Wifi,
   WifiOff,
@@ -24,6 +25,7 @@ interface TopNavProps {
   onExportJson: () => void;
   onExportZip: () => void;
   isExportingZip: boolean;
+  onNewCustomRun?: () => void;
 }
 
 export function TopNav({
@@ -38,6 +40,7 @@ export function TopNav({
   onExportJson,
   onExportZip,
   isExportingZip,
+  onNewCustomRun,
 }: TopNavProps) {
   const isLive = resolvedMode === "live" && !preferMockMode;
 
@@ -98,6 +101,18 @@ export function TopNav({
 
         {/* Right: Minimalist Controls & Clean Actions */}
         <div className="flex items-center gap-2">
+          {onNewCustomRun && (
+            <button
+              type="button"
+              onClick={onNewCustomRun}
+              title="Create a new custom campaign"
+              className="inline-flex items-center gap-1.5 rounded-full bg-[#1D1D1F] px-3.5 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-black"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>New Run</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onToggleMockMode}
@@ -133,7 +148,7 @@ export function TopNav({
                 type="button"
                 onClick={onExportZip}
                 disabled={isExportingZip}
-                className="inline-flex items-center gap-1.5 rounded-full bg-[#1D1D1F] px-4 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-black disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-full bg-[#0071E3] px-4 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-[#0077ED] disabled:opacity-50"
               >
                 <Download className="h-3.5 w-3.5" />
                 <span>{isExportingZip ? "Exporting..." : "Export Kit"}</span>

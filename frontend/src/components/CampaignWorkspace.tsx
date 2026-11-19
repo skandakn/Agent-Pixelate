@@ -10,12 +10,15 @@ import {
   Layers,
   Palette,
   PenTool,
+  Plus,
+  RotateCcw,
   ShieldCheck,
   Sparkles,
   Users,
   X,
   XCircle,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   AgentEvent,
   BandDelegationEdge,
@@ -30,7 +33,11 @@ import {
   VideoAspectRatio,
   VideoShotStyle,
 } from "@/types/campaign";
-import { DEMO_PRESETS } from "@/data/presets";
+import {
+  BLANK_CUSTOM_BRIEF,
+  CUSTOM_STARTER_TEMPLATES,
+  DEMO_PRESETS,
+} from "@/data/presets";
 import {
   approveBandHandoff,
   buildDefaultBandRoomState,
@@ -119,6 +126,8 @@ export function CampaignWorkspace() {
   const [preferMockMode, setPreferMockMode] = useState<boolean>(false);
   const [resolvedMode, setResolvedMode] = useState<ConnectionMode>("mock");
   const [modeNotice, setModeNotice] = useState<string | null>(null);
+  const [customModalOpen, setCustomModalOpen] = useState(false);
+  const [modalBrief, setModalBrief] = useState<CampaignBrief>(BLANK_CUSTOM_BRIEF);
 
   const [events, setEvents] = useState<AgentEvent[]>([]);
   const [currentStage, setCurrentStage] = useState<PipelineStage | null>(null);
@@ -605,6 +614,10 @@ export function CampaignWorkspace() {
         assets={finalAssets}
         onToggleMockMode={() => setPreferMockMode((v) => !v)}
         onOpenMobileDrawer={() => setMobileDrawerOpen(true)}
+        onNewCustomRun={() => {
+          setModalBrief(brief.productName ? { ...brief } : { ...BLANK_CUSTOM_BRIEF });
+          setCustomModalOpen(true);
+        }}
         onExportJson={handleExportJson}
         onExportZip={handleExportZip}
         isExportingZip={isExportingZip}
@@ -643,7 +656,7 @@ export function CampaignWorkspace() {
               <div className="mx-auto max-w-2xl text-center">
                 <div className="inline-flex items-center gap-2 rounded-full border border-black/[0.06] bg-neutral-50 px-3.5 py-1 text-xs font-medium text-neutral-600 shadow-sm">
                   <Sparkles className="h-3.5 w-3.5 text-[#0071E3]" />
-                  <span>Creative Intelligence</span>
+                  <span>Creative Intelligence · BAND Multi-Agent</span>
                 </div>
 
                 <h2 className="mt-4 text-4xl font-semibold tracking-tight text-[#1D1D1F] sm:text-5xl">
@@ -651,18 +664,31 @@ export function CampaignWorkspace() {
                 </h2>
 
                 <p className="mx-auto mt-4 max-w-lg text-sm leading-relaxed text-neutral-500">
-                  Autonomous visual direction, conversion copy, and cinematic video. All crafted in harmony.
+                  Autonomous visual direction, conversion copy, and cinematic video. All crafted in harmony by specialized AI agents.
                 </p>
 
-                <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
                   <button
                     type="button"
-                    onClick={() => handleLaunch()}
+                    onClick={() => {
+                      setModalBrief(brief.productName ? { ...brief } : { ...BLANK_CUSTOM_BRIEF });
+                      setCustomModalOpen(true);
+                    }}
                     className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0071E3] px-6 py-2.5 text-xs font-medium text-white shadow-sm transition hover:bg-[#0077ED] active:scale-[0.99]"
                   >
-                    <Sparkles className="h-4 w-4" />
-                    <span>Launch Campaign</span>
+                    <Plus className="h-4 w-4" />
+                    <span>Create Campaign</span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleLaunch(DEMO_PRESETS[0].brief)}
+                    className="inline-flex items-center justify-center gap-2 rounded-full border border-black/[0.08] bg-white px-5 py-2.5 text-xs font-medium text-neutral-700 shadow-sm transition hover:bg-neutral-50"
+                  >
+                    <Sparkles className="h-4 w-4 text-[#0071E3]" />
+                    <span>Quick Demo (LumaDrop)</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => setMobileDrawerOpen(true)}
@@ -752,6 +778,18 @@ export function CampaignWorkspace() {
                         </button>
                       </>
                     )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setModalBrief(brief.productName ? { ...brief } : { ...BLANK_CUSTOM_BRIEF });
+                        setCustomModalOpen(true);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-black/[0.08] bg-white px-3.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 shadow-sm transition"
+                    >
+                      <Plus className="h-3.5 w-3.5 text-neutral-500" />
+                      <span>New Run</span>
+                    </button>
 
                     <button
                       type="button"
@@ -890,6 +928,210 @@ export function CampaignWorkspace() {
                 className="rounded-full bg-neutral-900 px-4 py-2 text-xs font-medium text-white shadow-sm hover:bg-black"
               >
                 Send Guidance
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Campaign Modal - Clean Apple Style */}
+      {customModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm">
+          <div className="my-8 w-full max-w-xl rounded-2xl border border-black/[0.08] bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between border-b border-black/[0.06] pb-4">
+              <div>
+                <h3 className="text-base font-semibold text-[#1D1D1F]">
+                  Create Custom Campaign
+                </h3>
+                <p className="mt-0.5 text-xs text-neutral-500">
+                  Direct AI agents with custom parameters for visual and copy synthesis.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCustomModalOpen(false)}
+                className="rounded-lg p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+                aria-label="Close modal"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Starter chips */}
+            <div className="mt-4 rounded-xl border border-black/[0.06] bg-[#FBFBFD] p-3">
+              <div className="flex items-center justify-between pb-2">
+                <span className="text-[11px] font-medium text-neutral-500">
+                  Quick Starters
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setModalBrief(BLANK_CUSTOM_BRIEF)}
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-neutral-400 hover:text-neutral-600"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  <span>Clear</span>
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {CUSTOM_STARTER_TEMPLATES.map((tmpl) => {
+                  const active = modalBrief.productName === tmpl.brief.productName;
+                  return (
+                    <button
+                      key={tmpl.id}
+                      type="button"
+                      onClick={() => setModalBrief({ ...tmpl.brief, platforms: [...tmpl.brief.platforms] })}
+                      className={cn(
+                        "rounded-full px-3 py-1 text-xs font-medium transition",
+                        active
+                          ? "bg-neutral-900 text-white shadow-sm"
+                          : "border border-black/[0.08] bg-white text-neutral-700 hover:bg-neutral-100/70"
+                      )}
+                    >
+                      {tmpl.category}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Custom brief form */}
+            <div className="mt-4 space-y-3.5">
+              <div>
+                <label className="block text-xs font-medium text-neutral-600">
+                  Product / Brand Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={modalBrief.productName}
+                  onChange={(e) => setModalBrief({ ...modalBrief, productName: e.target.value })}
+                  placeholder="e.g. OrbitPulse DB or Veloce Carbon Commuter"
+                  className="mt-1 w-full rounded-xl border border-black/[0.08] bg-neutral-50/50 px-3 py-2 text-xs text-neutral-900 placeholder-neutral-400 outline-none focus:border-neutral-400 focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-neutral-600">
+                  Creative Story &amp; Value Proposition
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  value={modalBrief.productDescription}
+                  onChange={(e) => setModalBrief({ ...modalBrief, productDescription: e.target.value })}
+                  placeholder="Key features, materials, customer transformation, and visual identity..."
+                  className="mt-1 w-full resize-none rounded-xl border border-black/[0.08] bg-neutral-50/50 p-2.5 text-xs leading-relaxed text-neutral-900 placeholder-neutral-400 outline-none focus:border-neutral-400 focus:bg-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-medium text-neutral-600">
+                    Target Audience
+                  </label>
+                  <input
+                    type="text"
+                    value={modalBrief.targetAudience}
+                    onChange={(e) => setModalBrief({ ...modalBrief, targetAudience: e.target.value })}
+                    placeholder="e.g. Founders, designers, cyclists"
+                    className="mt-1 w-full rounded-xl border border-black/[0.08] bg-neutral-50/50 px-3 py-2 text-xs text-neutral-900 placeholder-neutral-400 outline-none focus:border-neutral-400 focus:bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-neutral-600">
+                    Brand Tone
+                  </label>
+                  <div className="mt-1 grid grid-cols-4 gap-1">
+                    {(["Bold", "Minimalist", "Luxury", "Playful"] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setModalBrief({ ...modalBrief, brandTone: t })}
+                        className={cn(
+                          "rounded-lg py-1.5 text-xs font-medium transition",
+                          modalBrief.brandTone === t
+                            ? "bg-neutral-900 text-white shadow-sm"
+                            : "border border-black/[0.06] bg-neutral-50/50 text-neutral-600 hover:bg-neutral-100"
+                        )}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-neutral-600">
+                  Channels
+                </label>
+                <div className="mt-1 grid grid-cols-3 gap-2">
+                  {(["Instagram", "LinkedIn", "Meta Ads"] as const).map((platform) => {
+                    const active = modalBrief.platforms.includes(platform);
+                    return (
+                      <button
+                        key={platform}
+                        type="button"
+                        onClick={() => {
+                          const next = active
+                            ? modalBrief.platforms.filter((p) => p !== platform)
+                            : [...modalBrief.platforms, platform];
+                          setModalBrief({ ...modalBrief, platforms: next });
+                        }}
+                        className={cn(
+                          "flex items-center justify-between rounded-xl border p-2 text-xs font-medium transition",
+                          active
+                            ? "border-neutral-900 bg-neutral-900 text-white shadow-sm"
+                            : "border-black/[0.06] bg-neutral-50/50 text-neutral-700 hover:bg-neutral-100"
+                        )}
+                      >
+                        <span>{platform}</span>
+                        <span>{active ? "✓" : "+"}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-xl border border-black/[0.06] bg-neutral-50/50 p-2.5">
+                <label className="flex cursor-pointer items-center gap-2 text-xs text-neutral-700">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(modalBrief.requireHandoffApproval)}
+                    onChange={(e) => setModalBrief({ ...modalBrief, requireHandoffApproval: e.target.checked })}
+                    className="h-3.5 w-3.5 rounded border-neutral-300 text-neutral-900 focus:ring-0"
+                  />
+                  <span>Require Approval Gate (pause before copy handoff)</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Modal actions */}
+            <div className="mt-6 flex items-center justify-end gap-2 border-t border-black/[0.06] pt-4">
+              <button
+                type="button"
+                onClick={() => setCustomModalOpen(false)}
+                className="rounded-full border border-black/[0.08] bg-white px-4 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={
+                  !modalBrief.productName.trim() ||
+                  !modalBrief.productDescription.trim() ||
+                  modalBrief.platforms.length === 0
+                }
+                onClick={() => {
+                  setBrief(modalBrief);
+                  setCustomModalOpen(false);
+                  handleLaunch(modalBrief);
+                }}
+                className="inline-flex items-center gap-2 rounded-full bg-[#0071E3] px-5 py-2 text-xs font-medium text-white shadow-sm transition hover:bg-[#0077ED] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Sparkles className="h-4 w-4" />
+                <span>Launch Campaign</span>
               </button>
             </div>
           </div>
