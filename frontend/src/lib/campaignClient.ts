@@ -298,6 +298,7 @@ function adaptBackendCampaignToAssets(
             ? asset.asset_url
             : `${apiBase}${asset.asset_url.startsWith("/") ? "" : "/"}${asset.asset_url}`;
           const platform = formatPlatformLabel(asset.platform);
+          const fallbackCreative = fallback.creatives[idx % fallback.creatives.length];
           return {
             id: asset.asset_id || `${backend.campaign_id}-vis-${idx + 1}`,
             title: asset.title,
@@ -306,11 +307,13 @@ function adaptBackendCampaignToAssets(
             aspectRatio: normalizeAspect(asset.aspect_ratio),
             platform,
             imageUrl: resolvedUrl,
+            options: (asset as { options?: VisualCreative["options"] }).options || fallbackCreative?.options,
             lighting:
-              fallback.creatives[idx % fallback.creatives.length]?.lighting ??
+              fallbackCreative?.lighting ??
               "Studio dual-axis rim lighting",
             composition:
               visual?.typography_direction ||
+              fallbackCreative?.composition ||
               "Balanced modular editorial layout with crisp negative space",
             artNote: visual?.creative_direction || fallback.artDirectionSummary,
             promptSummary:

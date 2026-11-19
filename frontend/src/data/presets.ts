@@ -9,8 +9,10 @@ import {
   SocialPost,
   StoryboardFrame,
   VisualCreative,
+  VisualOption,
 } from "@/types/campaign";
 import { CreativeMotif, generateCreativeSvg } from "@/lib/creativeArt";
+import { getProductVisualOptions } from "@/lib/productImagery";
 
 export const DEMO_PRESETS: DemoPreset[] = [
   {
@@ -239,6 +241,15 @@ export function buildSimulatedCampaignAssets(
     variant: 2,
   });
 
+  const visualOptions = getProductVisualOptions(brief, campaignId);
+  const studioOpt = visualOptions[0] ?? {
+    imageUrl: "https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=1400&q=85",
+    lighting: "Dual-axis rim lighting with cool cyan bounce and obsidian negative space",
+    composition: "Asymmetric rule-of-thirds split; tactile hardware silhouette anchored right",
+  };
+  const lifestyleOpt = visualOptions[1] ?? studioOpt;
+  const macroOpt = visualOptions[2] ?? studioOpt;
+
   const creatives: VisualCreative[] = [
     {
       id: `${campaignId}-vis-1`,
@@ -247,10 +258,10 @@ export function buildSimulatedCampaignAssets(
       format: "4:5 Editorial Portrait",
       aspectRatio: "4:5",
       platform: "Instagram",
-      imageUrl: art1.dataUrl,
-      svgMarkup: art1.svgMarkup,
-      lighting: "Dual-axis rim lighting with cool cyan bounce and obsidian negative space",
-      composition: "Asymmetric rule-of-thirds split; tactile hardware silhouette anchored right",
+      imageUrl: studioOpt.imageUrl,
+      options: visualOptions,
+      lighting: studioOpt.lighting ?? "Dual-axis rim lighting with cool cyan bounce and obsidian negative space",
+      composition: studioOpt.composition ?? "Asymmetric rule-of-thirds split; tactile hardware silhouette anchored right",
       artNote:
         "High-contrast chiaroscuro elevates perceived craftsmanship while leaving clean breathing room for bold kinetic display copy.",
       promptSummary: `Obsidian studio product photography of ${product}, dramatic ${primaryHex} and ${accentHex} rim glow, crisp editorial framing, ${tone.toLowerCase()} luxury finish.`,
@@ -262,10 +273,10 @@ export function buildSimulatedCampaignAssets(
       format: "1:1 Performance Square",
       aspectRatio: "1:1",
       platform: "Meta Ads",
-      imageUrl: art2.dataUrl,
-      svgMarkup: art2.svgMarkup,
-      lighting: "Volumetric top key light with glowing accent halo around signature feature",
-      composition: "Tight hero focus with micro-spec telemetry strip along bottom edge",
+      imageUrl: lifestyleOpt.imageUrl,
+      options: visualOptions,
+      lighting: lifestyleOpt.lighting ?? "Volumetric top key light with glowing accent halo around signature feature",
+      composition: lifestyleOpt.composition ?? "Tight hero focus with micro-spec telemetry strip along bottom edge",
       artNote:
         "Designed to earn attention within 0.8 seconds on mobile feeds by pairing a luminous visual focal point with crisp typographic hierarchy.",
       promptSummary: `Close-up commercial campaign card for ${product}, luminous ${secondaryHex} atmosphere, micro-grid studio texture, high conversion visual clarity.`,
@@ -277,10 +288,10 @@ export function buildSimulatedCampaignAssets(
       format: "16:9 Widescreen Cinema",
       aspectRatio: "16:9",
       platform: "LinkedIn",
-      imageUrl: art3.dataUrl,
-      svgMarkup: art3.svgMarkup,
-      lighting: "Soft architectural side-fill with subtle metallic sheen",
-      composition: "Panoramic layout balancing brand story headline and product proof",
+      imageUrl: macroOpt.imageUrl,
+      options: visualOptions,
+      lighting: macroOpt.lighting ?? "Soft architectural side-fill with subtle metallic sheen",
+      composition: macroOpt.composition ?? "Panoramic layout balancing brand story headline and product proof",
       artNote:
         "Strips away ad clutter in favor of confident editorial restraint that resonates with decision-makers and design-literate buyers.",
       promptSummary: `Widescreen brand film still for ${product}, ${tone.toLowerCase()} design studio aesthetic, clean negative space, refined ${primaryHex} gradient accents.`,
