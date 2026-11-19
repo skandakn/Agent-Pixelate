@@ -62,6 +62,91 @@ export const DEMO_PRESETS: DemoPreset[] = [
   },
 ];
 
+export const BLANK_CUSTOM_BRIEF: CampaignBrief = {
+  productName: "",
+  productDescription: "",
+  targetAudience: "",
+  brandTone: "Bold",
+  platforms: ["Instagram", "LinkedIn", "Meta Ads"],
+  requireHandoffApproval: false,
+};
+
+export interface CustomStarterTemplate {
+  id: string;
+  category: string;
+  badge: string;
+  brief: CampaignBrief;
+}
+
+export const CUSTOM_STARTER_TEMPLATES: CustomStarterTemplate[] = [
+  {
+    id: "starter-blank",
+    category: "Blank Slate",
+    badge: "NEW SPEC",
+    brief: BLANK_CUSTOM_BRIEF,
+  },
+  {
+    id: "starter-saas",
+    category: "AI SaaS & DevTools",
+    badge: "TECH / B2B",
+    brief: {
+      productName: "AetherFlow AI",
+      productDescription:
+        "Autonomous agentic workflow engine for engineering teams. Dispatches multi-agent PR reviews in 12 seconds, verifies WCAG accessibility, and auto-syncs zero-drift architectural documentation across enterprise repos.",
+      targetAudience:
+        "Engineering directors, staff platform architects, and high-velocity developer teams",
+      brandTone: "Bold",
+      platforms: ["LinkedIn", "Meta Ads"],
+      requireHandoffApproval: false,
+    },
+  },
+  {
+    id: "starter-apparel",
+    category: "Performance Apparel",
+    badge: "FOOTWEAR",
+    brief: {
+      productName: "Veloce Carbon Strider",
+      productDescription:
+        "Featherlight aerospace carbon-plate marathon racing shoes engineered with supercritical nitrogen-infused foam and responsive bio-traction lugs for sub-3-hour distance runners.",
+      targetAudience:
+        "Competitive marathoners, triathletes, urban track clubs, and performance athletes",
+      brandTone: "Bold",
+      platforms: ["Instagram", "Meta Ads"],
+      requireHandoffApproval: false,
+    },
+  },
+  {
+    id: "starter-smarthome",
+    category: "Smart Home Hardware",
+    badge: "INTERIOR",
+    brief: {
+      productName: "Solafide Ambient Hub",
+      productDescription:
+        "Minimalist machined aluminum smart climate and ambient lighting orchestrator featuring an edge-AI voice dial, matte OLED status lens, and local cryptographic privacy mesh.",
+      targetAudience:
+        "Architects, minimal design purists, smart home hobbyists, and audiophile interior designers",
+      brandTone: "Minimalist",
+      platforms: ["Instagram", "LinkedIn", "Meta Ads"],
+      requireHandoffApproval: false,
+    },
+  },
+  {
+    id: "starter-luxury",
+    category: "Luxury Botanical Elixir",
+    badge: "BEAUTY",
+    brief: {
+      productName: "Lumina Obsidian Serum",
+      productDescription:
+        "Cellular restorative midnight elixir formulated with cold-pressed alpine adaptogens and volcanic bio-minerals, preserved in light-blocking violet glass flacons.",
+      targetAudience:
+        "Luxury wellness collectors, dermatologist-guided skincare enthusiasts, and clean beauty purists",
+      brandTone: "Luxury",
+      platforms: ["Instagram", "Meta Ads"],
+      requireHandoffApproval: false,
+    },
+  },
+];
+
 function detectMotif(brief: CampaignBrief): CreativeMotif {
   const haystack = `${brief.productName} ${brief.productDescription}`.toLowerCase();
   if (

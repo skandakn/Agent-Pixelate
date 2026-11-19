@@ -1,15 +1,19 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { Loader2, Sparkles, Square, X } from "lucide-react";
+import { Loader2, Plus, RotateCcw, Sparkles, Square, X } from "lucide-react";
 import {
   BrandTone,
   CampaignBrief,
   CampaignStatus,
   Platform,
 } from "@/types/campaign";
-import { DEMO_PRESETS } from "@/data/presets";
+import {
+  BLANK_CUSTOM_BRIEF,
+  CUSTOM_STARTER_TEMPLATES,
+  DEMO_PRESETS,
+} from "@/data/presets";
 import { cn } from "@/lib/utils";
 
 const BRAND_TONES: BrandTone[] = ["Bold", "Minimalist", "Luxury", "Playful"];
@@ -38,6 +42,7 @@ export function CampaignBriefStudio({
   mobileOpen = false,
   onCloseMobile,
 }: CampaignBriefStudioProps) {
+  const [studioMode, setStudioMode] = useState<"custom" | "presets">("custom");
   const isRunning = status === "running";
   const canLaunch =
     brief.productName.trim().length > 0 &&
@@ -57,6 +62,10 @@ export function CampaignBriefStudio({
     onChangeBrief({ ...presetBrief, platforms: [...presetBrief.platforms] });
   };
 
+  const handleApplyCustomStarter = (starterBrief: CampaignBrief) => {
+    onChangeBrief({ ...starterBrief, platforms: [...starterBrief.platforms] });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (canLaunch) {
@@ -64,6 +73,10 @@ export function CampaignBriefStudio({
       onCloseMobile?.();
     }
   };
+
+  const isPresetSelected = DEMO_PRESETS.some(
+    (p) => p.brief.productName === brief.productName
+  );
 
   const studioContent = (
     <form
@@ -76,14 +89,14 @@ export function CampaignBriefStudio({
           <div>
             <div className="flex items-center gap-2">
               <span className="border border-black bg-[#10B981] px-1.5 py-0.5 font-mono text-[10px] font-black uppercase text-black">
-                CONFIG
+                {studioMode === "custom" ? "BESPOKE" : "DEMO"}
               </span>
               <h2 className="font-display text-base font-black uppercase tracking-tight text-black">
-                Campaign Brief Specification
+                Campaign Brief Studio
               </h2>
             </div>
             <p className="mt-1 font-mono text-xs text-black/70">
-              Input parameters to instruct @VisualAgent &amp; @CopyAgent in the BAND room.
+              Instruct @VisualAgent &amp; @CopyAgent with custom parameters.
             </p>
           </div>
           {onCloseMobile && (
@@ -98,56 +111,135 @@ export function CampaignBriefStudio({
           )}
         </div>
 
-        {/* Presets */}
-        <div className="space-y-2">
-          <span className="block font-mono text-[11px] font-bold uppercase tracking-wider text-black">
-            Pre-Approved Campaign Templates
-          </span>
-          <div className="grid grid-cols-1 gap-2">
-            {DEMO_PRESETS.map((preset) => {
-              const isSelected =
-                brief.productName === preset.brief.productName &&
-                brief.brandTone === preset.brief.brandTone;
-              return (
-                <button
-                  key={preset.id}
-                  type="button"
-                  disabled={isRunning}
-                  onClick={() => applyPreset(preset.brief)}
-                  className={cn(
-                    "group flex items-center justify-between border-2 border-black p-2.5 text-left transition-all",
-                    isSelected
-                      ? "bg-[#D1FAE5] shadow-[3px_3px_0px_#000000]"
-                      : "bg-white shadow-[2px_2px_0px_#000000] hover:bg-[#F3F4F6] hover:translate-x-[1px] hover:translate-y-[1px]",
-                    isRunning && "cursor-not-allowed opacity-50"
-                  )}
-                >
-                  <div className="min-w-0 pr-2">
-                    <div className="truncate font-display text-[13px] font-bold text-black">
-                      {preset.label}
-                    </div>
-                    <div className="truncate font-mono text-[11px] text-black/60">
-                      {preset.tagline}
-                    </div>
-                  </div>
-                  <span
-                    className="h-3 w-3 shrink-0 border border-black shadow-[1px_1px_0px_#000000]"
-                    style={{ backgroundColor: preset.accentHex }}
-                  />
-                </button>
-              );
-            })}
-          </div>
+        {/* Mode Switcher: Custom Campaign vs. Pre-Approved Presets */}
+        <div className="grid grid-cols-2 gap-1.5 border-2 border-black bg-black/5 p-1 font-mono text-xs">
+          <button
+            type="button"
+            disabled={isRunning}
+            onClick={() => setStudioMode("custom")}
+            className={cn(
+              "flex items-center justify-center gap-1.5 py-2 font-black uppercase transition-all",
+              studioMode === "custom"
+                ? "border-2 border-black bg-[#10B981] text-black shadow-[2px_2px_0px_#000000]"
+                : "border border-transparent bg-white text-black/70 hover:text-black"
+            )}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            <span>Custom Brief</span>
+          </button>
+          <button
+            type="button"
+            disabled={isRunning}
+            onClick={() => setStudioMode("presets")}
+            className={cn(
+              "flex items-center justify-center gap-1.5 py-2 font-black uppercase transition-all",
+              studioMode === "presets"
+                ? "border-2 border-black bg-white text-black shadow-[2px_2px_0px_#000000]"
+                : "border border-transparent bg-white text-black/70 hover:text-black"
+            )}
+          >
+            <span>Demos ({DEMO_PRESETS.length})</span>
+          </button>
         </div>
+
+        {/* Custom Campaign Quick Starters & Reset */}
+        {studioMode === "custom" ? (
+          <div className="space-y-2 border-2 border-black bg-[#E6F7EB]/40 p-3 shadow-[2px_2px_0px_#000000]">
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-[10px] font-black uppercase tracking-wider text-black">
+                ✨ Custom Product Starters:
+              </span>
+              <button
+                type="button"
+                disabled={isRunning}
+                onClick={() => onChangeBrief(BLANK_CUSTOM_BRIEF)}
+                className="inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase text-[#DC2626] hover:underline"
+              >
+                <RotateCcw className="h-3 w-3" />
+                <span>Clear Blank</span>
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {CUSTOM_STARTER_TEMPLATES.map((tmpl) => {
+                const active = brief.productName === tmpl.brief.productName;
+                return (
+                  <button
+                    key={tmpl.id}
+                    type="button"
+                    disabled={isRunning}
+                    onClick={() => handleApplyCustomStarter(tmpl.brief)}
+                    className={cn(
+                      "border border-black px-2 py-1 font-mono text-[10px] font-bold transition",
+                      active
+                        ? "bg-[#10B981] text-black shadow-[1px_1px_0px_#000000] font-black"
+                        : "bg-white text-black hover:bg-gray-100"
+                    )}
+                  >
+                    {tmpl.category}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          /* Presets in Approva Brutalist Style */
+          <div className="space-y-2">
+            <span className="block font-mono text-[11px] font-bold uppercase tracking-wider text-black">
+              Pre-Approved Campaign Templates
+            </span>
+            <div className="grid grid-cols-1 gap-2">
+              {DEMO_PRESETS.map((preset) => {
+                const isSelected =
+                  brief.productName === preset.brief.productName &&
+                  brief.brandTone === preset.brief.brandTone;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    disabled={isRunning}
+                    onClick={() => applyPreset(preset.brief)}
+                    className={cn(
+                      "group flex items-center justify-between border-2 border-black p-2.5 text-left transition-all",
+                      isSelected
+                        ? "bg-[#D1FAE5] shadow-[3px_3px_0px_#000000]"
+                        : "bg-white shadow-[2px_2px_0px_#000000] hover:bg-[#F3F4F6] hover:translate-x-[1px] hover:translate-y-[1px]",
+                      isRunning && "cursor-not-allowed opacity-50"
+                    )}
+                  >
+                    <div className="min-w-0 pr-2">
+                      <div className="truncate font-display text-[13px] font-bold text-black">
+                        {preset.label}
+                      </div>
+                      <div className="truncate font-mono text-[11px] text-black/60">
+                        {preset.tagline}
+                      </div>
+                    </div>
+                    <span
+                      className="h-3 w-3 shrink-0 border border-black shadow-[1px_1px_0px_#000000]"
+                      style={{ backgroundColor: preset.accentHex }}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Product Name */}
         <div className="space-y-1.5">
-          <label
-            htmlFor="productName"
-            className="block font-mono text-[11px] font-bold uppercase tracking-wider text-black"
-          >
-            Product / Offering Identifier
-          </label>
+          <div className="flex items-center justify-between">
+            <label
+              htmlFor="productName"
+              className="block font-mono text-[11px] font-bold uppercase tracking-wider text-black"
+            >
+              Product / Offering Identifier
+            </label>
+            {brief.productName && (
+              <span className="font-mono text-[10px] text-black/60">
+                {isPresetSelected ? "Template" : "Custom"}
+              </span>
+            )}
+          </div>
           <input
             id="productName"
             type="text"
@@ -157,7 +249,7 @@ export function CampaignBriefStudio({
             onChange={(e) =>
               onChangeBrief({ ...brief, productName: e.target.value })
             }
-            placeholder="e.g. Aura Soundbar Spatial"
+            placeholder="e.g. Veloce Carbon Bike or AeroFlow AI"
             className="w-full border-2 border-black bg-white px-3 py-2 font-mono text-sm text-black placeholder-black/40 shadow-[2px_2px_0px_#000000] outline-none transition focus:bg-[#E6F7EB] disabled:bg-gray-100 disabled:opacity-50"
           />
         </div>
@@ -184,7 +276,7 @@ export function CampaignBriefStudio({
             onChange={(e) =>
               onChangeBrief({ ...brief, productDescription: e.target.value })
             }
-            placeholder="Define core features, materials, acoustic architecture, and customer benefit..."
+            placeholder="Describe what makes this product unique: key specs, materials, customer transformation, and hardware/software features..."
             className="w-full resize-none border-2 border-black bg-white px-3 py-2 font-mono text-xs leading-relaxed text-black placeholder-black/40 shadow-[2px_2px_0px_#000000] outline-none transition focus:bg-[#E6F7EB] disabled:bg-gray-100 disabled:opacity-50"
           />
         </div>
@@ -205,7 +297,7 @@ export function CampaignBriefStudio({
             onChange={(e) =>
               onChangeBrief({ ...brief, targetAudience: e.target.value })
             }
-            placeholder="e.g. Audiophiles, interior architects, premium design lovers"
+            placeholder="e.g. Founders, competitive athletes, luxury design buyers"
             className="w-full border-2 border-black bg-white px-3 py-2 font-mono text-xs text-black placeholder-black/40 shadow-[2px_2px_0px_#000000] outline-none transition focus:bg-[#E6F7EB] disabled:bg-gray-100 disabled:opacity-50"
           />
         </div>

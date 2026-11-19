@@ -10,12 +10,15 @@ import {
   Layers,
   Palette,
   PenTool,
+  Plus,
+  RotateCcw,
   ShieldCheck,
   Sparkles,
   Users,
   X,
   XCircle,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   AgentEvent,
   BandDelegationEdge,
@@ -30,7 +33,11 @@ import {
   VideoAspectRatio,
   VideoShotStyle,
 } from "@/types/campaign";
-import { DEMO_PRESETS } from "@/data/presets";
+import {
+  BLANK_CUSTOM_BRIEF,
+  CUSTOM_STARTER_TEMPLATES,
+  DEMO_PRESETS,
+} from "@/data/presets";
 import {
   approveBandHandoff,
   buildDefaultBandRoomState,
@@ -119,6 +126,8 @@ export function CampaignWorkspace() {
   const [preferMockMode, setPreferMockMode] = useState<boolean>(false);
   const [resolvedMode, setResolvedMode] = useState<ConnectionMode>("mock");
   const [modeNotice, setModeNotice] = useState<string | null>(null);
+  const [customModalOpen, setCustomModalOpen] = useState(false);
+  const [modalBrief, setModalBrief] = useState<CampaignBrief>(BLANK_CUSTOM_BRIEF);
 
   const [events, setEvents] = useState<AgentEvent[]>([]);
   const [currentStage, setCurrentStage] = useState<PipelineStage | null>(null);
@@ -604,6 +613,10 @@ export function CampaignWorkspace() {
         assets={finalAssets}
         onToggleMockMode={() => setPreferMockMode((v) => !v)}
         onOpenMobileDrawer={() => setMobileDrawerOpen(true)}
+        onNewCustomRun={() => {
+          setModalBrief(brief.productName ? { ...brief } : { ...BLANK_CUSTOM_BRIEF });
+          setCustomModalOpen(true);
+        }}
         onExportJson={handleExportJson}
         onExportZip={handleExportZip}
         isExportingZip={isExportingZip}
@@ -637,9 +650,10 @@ export function CampaignWorkspace() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, ease: "easeOut" }}
-              className="border-2 border-black bg-white p-7 shadow-[4px_4px_0px_#000000] sm:p-12"
+              className="space-y-6"
             >
-              <div className="mx-auto max-w-3xl text-center">
+              {/* Approva Hero Header */}
+              <div className="border-2 border-black bg-white p-7 text-center shadow-[4px_4px_0px_#000000] sm:p-10">
                 <div className="inline-flex items-center gap-2 border-2 border-black bg-[#E6F7EB] px-3.5 py-1 font-mono text-xs font-bold uppercase text-black shadow-[2px_2px_0px_#000000]">
                   <Sparkles className="h-3.5 w-3.5 text-[#10B981]" />
                   <span>Approva × Agent Pixelate · Powered by BAND</span>
@@ -652,20 +666,31 @@ export function CampaignWorkspace() {
                 </h2>
 
                 <p className="mx-auto mt-4 max-w-2xl font-mono text-xs leading-relaxed text-black/70 sm:text-sm">
-                  Work directly alongside <span className="font-bold text-black">@visual_pixelate</span> and{" "}
-                  <span className="font-bold text-black">@copy_pixelate</span> inside a live BAND shared room—delegate via @mentions,
-                  pin shared brand guardrails into memory, and approve handoffs with full fintech auditability.
+                  Launch a bespoke multi-agent campaign for <span className="font-bold text-black">any custom product</span> or pick a pre-approved fintech docket. Direct <span className="font-bold text-black">@visual_pixelate</span> and <span className="font-bold text-black">@copy_pixelate</span> inside a live BAND room with full auditability.
                 </p>
 
                 <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
                   <button
                     type="button"
-                    onClick={() => handleLaunch()}
+                    onClick={() => {
+                      setModalBrief(brief.productName ? { ...brief } : { ...BLANK_CUSTOM_BRIEF });
+                      setCustomModalOpen(true);
+                    }}
                     className="inline-flex items-center justify-center gap-2 border-2 border-black bg-[#10B981] px-6 py-2.5 font-mono text-xs font-black uppercase text-black shadow-[4px_4px_0px_#000000] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_#000000]"
                   >
-                    <Sparkles className="h-4 w-4" />
-                    <span>Launch Campaign</span>
+                    <Plus className="h-4 w-4 stroke-[3]" />
+                    <span>Create Custom Campaign</span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleLaunch(DEMO_PRESETS[0].brief)}
+                    className="inline-flex items-center justify-center gap-2 border-2 border-black bg-white px-5 py-2.5 font-mono text-xs font-bold uppercase text-black shadow-[3px_3px_0px_#000000] transition-all hover:bg-gray-50 hover:translate-x-[1px] hover:translate-y-[1px]"
+                  >
+                    <Sparkles className="h-4 w-4 text-[#10B981]" />
+                    <span>Quick Demo (LumaDrop)</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => setMobileDrawerOpen(true)}
@@ -676,42 +701,165 @@ export function CampaignWorkspace() {
                 </div>
               </div>
 
-              {/* Presets in Approva Brutalist Style */}
-              <div className="mx-auto mt-10 grid max-w-4xl grid-cols-1 gap-4 md:grid-cols-3">
-                {DEMO_PRESETS.map((preset) => (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => handleLaunch(preset.brief)}
-                    className="group flex flex-col justify-between border-2 border-black bg-white p-5 text-left shadow-[3px_3px_0px_#000000] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_#000000]"
-                  >
+              {/* Bespoke Custom Campaign Quick-Launcher Card */}
+              <div className="border-2 border-black bg-white p-6 shadow-[4px_4px_0px_#000000]">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-black pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="border border-black bg-[#10B981] px-2 py-0.5 font-mono text-[10px] font-black uppercase text-black">
+                      BESPOKE RUN
+                    </span>
+                    <h3 className="font-display text-sm font-black uppercase tracking-tight text-black">
+                      Launch Custom Campaign Brief
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[11px] text-black/60">
+                      Starters:
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {CUSTOM_STARTER_TEMPLATES.map((tmpl) => (
+                        <button
+                          key={tmpl.id}
+                          type="button"
+                          onClick={() => setBrief({ ...tmpl.brief, platforms: [...tmpl.brief.platforms] })}
+                          className={cn(
+                            "border border-black px-2 py-0.5 font-mono text-[10px] font-bold transition",
+                            brief.productName === tmpl.brief.productName
+                              ? "bg-[#10B981] text-black font-black"
+                              : "bg-white text-black hover:bg-gray-100"
+                          )}
+                        >
+                          {tmpl.category}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
+                  <div className="space-y-3 lg:col-span-7">
                     <div>
-                      <div className="flex items-center justify-between border-b border-black pb-2">
-                        <span
-                          className="h-3.5 w-3.5 border border-black shadow-[1px_1px_0px_#000000]"
-                          style={{ backgroundColor: preset.accentHex }}
-                        />
-                        <span className="border border-black bg-[#E6F7EB] px-1.5 py-0.2 font-mono text-[9px] font-bold uppercase text-black">
-                          {preset.brief.brandTone}
-                        </span>
+                      <label className="block font-mono text-[11px] font-bold uppercase text-black">
+                        Product / Brand Identifier
+                      </label>
+                      <input
+                        type="text"
+                        value={brief.productName}
+                        onChange={(e) => setBrief({ ...brief, productName: e.target.value })}
+                        placeholder="e.g. Veloce Carbon Bike or AeroFlow AI"
+                        className="mt-1 w-full border-2 border-black bg-white p-2.5 font-mono text-xs text-black placeholder-black/40 shadow-[2px_2px_0px_#000000] outline-none focus:bg-[#E6F7EB]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-mono text-[11px] font-bold uppercase text-black">
+                        Creative Story &amp; Value Proposition
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={brief.productDescription}
+                        onChange={(e) => setBrief({ ...brief, productDescription: e.target.value })}
+                        placeholder="Describe key features, specs, materials, and customer transformation..."
+                        className="mt-1 w-full resize-none border-2 border-black bg-white p-2.5 font-mono text-xs text-black placeholder-black/40 shadow-[2px_2px_0px_#000000] outline-none focus:bg-[#E6F7EB]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col justify-between space-y-3 lg:col-span-5">
+                    <div>
+                      <label className="block font-mono text-[11px] font-bold uppercase text-black">
+                        Target Audience
+                      </label>
+                      <input
+                        type="text"
+                        value={brief.targetAudience}
+                        onChange={(e) => setBrief({ ...brief, targetAudience: e.target.value })}
+                        placeholder="e.g. Urban athletes, founders, luxury buyers"
+                        className="mt-1 w-full border-2 border-black bg-white p-2.5 font-mono text-xs text-black placeholder-black/40 shadow-[2px_2px_0px_#000000] outline-none focus:bg-[#E6F7EB]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-mono text-[11px] font-bold uppercase text-black">
+                        Tone Matrix
+                      </label>
+                      <div className="mt-1 grid grid-cols-4 gap-1.5 font-mono text-[11px]">
+                        {(["Bold", "Minimalist", "Luxury", "Playful"] as const).map((t) => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => setBrief({ ...brief, brandTone: t })}
+                            className={cn(
+                              "border border-black py-1 font-bold uppercase transition",
+                              brief.brandTone === t
+                                ? "bg-[#10B981] text-black shadow-[1px_1px_0px_#000000] font-black"
+                                : "bg-white text-black hover:bg-gray-100"
+                            )}
+                          >
+                            {t}
+                          </button>
+                        ))}
                       </div>
-                      <h3 className="mt-3 font-display text-sm font-black uppercase text-black">
-                        {preset.label}
-                      </h3>
-                      <p className="mt-1 font-mono text-[11px] leading-relaxed text-black/70">
-                        {preset.tagline}
-                      </p>
                     </div>
-                    <div className="mt-4 flex items-center justify-between border-t border-black pt-2 font-mono text-xs font-bold uppercase text-black">
-                      <span>Launch Demo</span>
-                      <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                    </div>
-                  </button>
-                ))}
+
+                    <button
+                      type="button"
+                      disabled={!brief.productName.trim() || !brief.productDescription.trim()}
+                      onClick={() => handleLaunch()}
+                      className="inline-flex w-full items-center justify-center gap-2 border-2 border-black bg-[#10B981] py-3 font-mono text-xs font-black uppercase text-black shadow-[3px_3px_0px_#000000] transition hover:translate-x-[1px] hover:translate-y-[1px] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:opacity-50"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      <span>DISPATCH BESPOKE RUN NOW</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Presets in Approva Brutalist Style */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-t-2 border-black pt-4">
+                  <span className="font-mono text-xs font-black uppercase tracking-wider text-black">
+                    Or Test Pre-Approved Fintech Dockets:
+                  </span>
+                  <span className="font-mono text-[11px] text-black/60">
+                    3 verified presets with live video &amp; copy models
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  {DEMO_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => handleLaunch(preset.brief)}
+                      className="group flex flex-col justify-between border-2 border-black bg-white p-5 text-left shadow-[3px_3px_0px_#000000] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_#000000]"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between border-b border-black pb-2">
+                          <span
+                            className="h-3.5 w-3.5 border border-black shadow-[1px_1px_0px_#000000]"
+                            style={{ backgroundColor: preset.accentHex }}
+                          />
+                          <span className="border border-black bg-[#E6F7EB] px-1.5 py-0.2 font-mono text-[9px] font-bold uppercase text-black">
+                            {preset.brief.brandTone}
+                          </span>
+                        </div>
+                        <h3 className="mt-3 font-display text-sm font-black uppercase text-black">
+                          {preset.label}
+                        </h3>
+                        <p className="mt-1 font-mono text-[11px] leading-relaxed text-black/70">
+                          {preset.tagline}
+                        </p>
+                      </div>
+                      <div className="mt-4 flex items-center justify-between border-t border-black pt-2 font-mono text-xs font-bold uppercase text-black">
+                        <span>Launch Demo</span>
+                        <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Restrained Feature Spec Row */}
-              <div className="mx-auto mt-8 flex max-w-3xl flex-wrap items-center justify-center gap-x-8 gap-y-3 border-t-2 border-black pt-5 font-mono text-xs font-bold uppercase text-black/80">
+              <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-x-8 gap-y-3 border-t-2 border-black pt-5 font-mono text-xs font-bold uppercase text-black/80">
                 <span className="inline-flex items-center gap-1.5">
                   <Users className="h-4 w-4 text-black" />
                   Live BAND Room &amp; Shared Memory
@@ -794,6 +942,18 @@ export function CampaignWorkspace() {
                       >
                         <Download className="h-3.5 w-3.5" />
                         <span>{isExportingZip ? "PACKING..." : "EXPORT KIT"}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setModalBrief(brief.productName ? { ...brief } : { ...BLANK_CUSTOM_BRIEF });
+                          setCustomModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1 border-2 border-black bg-[#10B981] px-3 py-1.5 font-mono text-xs font-black uppercase text-black shadow-[2px_2px_0px_#000000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
+                      >
+                        <Plus className="h-3.5 w-3.5 stroke-[3]" />
+                        <span>+ NEW RUN</span>
                       </button>
                     </div>
                   </div>
@@ -926,6 +1086,229 @@ export function CampaignWorkspace() {
               >
                 DISPATCH DIRECTIVE
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Campaign Modal */}
+      {customModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
+          <div className="my-8 w-full max-w-2xl border-4 border-black bg-[#E6F7EB] p-6 shadow-[8px_8px_0px_#000000]">
+            <div className="flex items-start justify-between border-b-2 border-black pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="border border-black bg-[#10B981] px-2 py-0.5 font-mono text-[11px] font-black uppercase text-black">
+                    NEW RUN · BESPOKE SPECIFICATION
+                  </span>
+                  <span className="border border-black bg-white px-2 py-0.5 font-mono text-[11px] font-bold text-black">
+                    BAND v2.4
+                  </span>
+                </div>
+                <h3 className="mt-2 font-display text-xl font-black uppercase tracking-tight text-black">
+                  Launch Custom Campaign
+                </h3>
+                <p className="mt-1 font-mono text-xs text-black/70">
+                  Specify any arbitrary product or service. Both @visual_pixelate and @copy_pixelate will synthesize unique art direction, kinetic video cuts, platform copy, and an auditable docket.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCustomModalOpen(false)}
+                className="border-2 border-black bg-white p-1 text-black shadow-[2px_2px_0px_#000000] hover:translate-x-[1px] hover:translate-y-[1px]"
+                aria-label="Close modal"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Starter chips */}
+            <div className="mt-4 border-2 border-black bg-white p-3 shadow-[2px_2px_0px_#000000]">
+              <div className="flex items-center justify-between pb-2">
+                <span className="font-mono text-[11px] font-black uppercase text-black">
+                  ✨ 1-Click Custom Starters:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setModalBrief(BLANK_CUSTOM_BRIEF)}
+                  className="inline-flex items-center gap-1 font-mono text-[11px] font-bold uppercase text-[#DC2626] hover:underline"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  <span>Clear to Blank</span>
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {CUSTOM_STARTER_TEMPLATES.map((tmpl) => {
+                  const active = modalBrief.productName === tmpl.brief.productName;
+                  return (
+                    <button
+                      key={tmpl.id}
+                      type="button"
+                      onClick={() => setModalBrief({ ...tmpl.brief, platforms: [...tmpl.brief.platforms] })}
+                      className={cn(
+                        "border border-black px-2.5 py-1 font-mono text-xs font-bold transition",
+                        active
+                          ? "bg-[#10B981] font-black text-black shadow-[1px_1px_0px_#000000]"
+                          : "bg-white text-black hover:bg-gray-100"
+                      )}
+                    >
+                      {tmpl.category}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Custom brief form */}
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="block font-mono text-xs font-black uppercase text-black">
+                  Product / Offering Identifier *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={modalBrief.productName}
+                  onChange={(e) => setModalBrief({ ...modalBrief, productName: e.target.value })}
+                  placeholder="e.g. OrbitPulse Autonomous DB or Veloce Carbon Commuter"
+                  className="mt-1 w-full border-2 border-black bg-white p-2.5 font-mono text-sm text-black placeholder-black/40 shadow-[2px_2px_0px_#000000] outline-none focus:bg-[#E6F7EB]"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="block font-mono text-xs font-black uppercase text-black">
+                    Creative Story &amp; Value Proposition *
+                  </label>
+                  <span className="font-mono text-[11px] text-black/60">
+                    {modalBrief.productDescription.length} chars
+                  </span>
+                </div>
+                <textarea
+                  rows={4}
+                  required
+                  value={modalBrief.productDescription}
+                  onChange={(e) => setModalBrief({ ...modalBrief, productDescription: e.target.value })}
+                  placeholder="Explain what the product does, key specs, materials, target customer transformation, and visual brand identity..."
+                  className="mt-1 w-full resize-none border-2 border-black bg-white p-2.5 font-mono text-xs leading-relaxed text-black placeholder-black/40 shadow-[2px_2px_0px_#000000] outline-none focus:bg-[#E6F7EB]"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="block font-mono text-xs font-black uppercase text-black">
+                    Target Audience Segment
+                  </label>
+                  <input
+                    type="text"
+                    value={modalBrief.targetAudience}
+                    onChange={(e) => setModalBrief({ ...modalBrief, targetAudience: e.target.value })}
+                    placeholder="e.g. Enterprise DevOps leads, seed founders, luxury buyers"
+                    className="mt-1 w-full border-2 border-black bg-white p-2.5 font-mono text-xs text-black placeholder-black/40 shadow-[2px_2px_0px_#000000] outline-none focus:bg-[#E6F7EB]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-mono text-xs font-black uppercase text-black">
+                    Brand Tone Matrix
+                  </label>
+                  <div className="mt-1 grid grid-cols-4 gap-1.5 font-mono text-xs">
+                    {(["Bold", "Minimalist", "Luxury", "Playful"] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setModalBrief({ ...modalBrief, brandTone: t })}
+                        className={cn(
+                          "border-2 border-black py-2 font-bold uppercase transition",
+                          modalBrief.brandTone === t
+                            ? "bg-[#10B981] font-black text-black shadow-[2px_2px_0px_#000000]"
+                            : "bg-white text-black hover:bg-gray-100"
+                        )}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-mono text-xs font-black uppercase text-black">
+                  Target Channels *
+                </label>
+                <div className="mt-1 grid grid-cols-3 gap-2">
+                  {(["Instagram", "LinkedIn", "Meta Ads"] as const).map((platform) => {
+                    const active = modalBrief.platforms.includes(platform);
+                    return (
+                      <button
+                        key={platform}
+                        type="button"
+                        onClick={() => {
+                          const next = active
+                            ? modalBrief.platforms.filter((p) => p !== platform)
+                            : [...modalBrief.platforms, platform];
+                          setModalBrief({ ...modalBrief, platforms: next });
+                        }}
+                        className={cn(
+                          "flex items-center justify-between border-2 border-black p-2.5 font-mono text-xs font-black uppercase transition",
+                          active
+                            ? "bg-[#10B981] text-black shadow-[2px_2px_0px_#000000]"
+                            : "bg-white text-black hover:bg-gray-100"
+                        )}
+                      >
+                        <span>{platform}</span>
+                        <span>{active ? "✓" : "+"}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between border-2 border-black bg-white p-2.5 shadow-[2px_2px_0px_#000000]">
+                <label className="flex cursor-pointer items-center gap-2 font-mono text-xs font-bold text-black">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(modalBrief.requireHandoffApproval)}
+                    onChange={(e) => setModalBrief({ ...modalBrief, requireHandoffApproval: e.target.checked })}
+                    className="h-4 w-4 border-2 border-black accent-black"
+                  />
+                  <span>Require Human Handoff Sign-off (Pause between @visual &amp; @copy)</span>
+                </label>
+                <span className="font-mono text-[10px] text-black/60">Fintech Gate</span>
+              </div>
+            </div>
+
+            {/* Modal actions */}
+            <div className="mt-6 flex items-center justify-between border-t-2 border-black pt-4">
+              <div className="font-mono text-[11px] text-black/70">
+                <span className="font-bold">EST:</span> $0.048 USD (1,920 tok) · ZERO DRIFT
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCustomModalOpen(false)}
+                  className="border-2 border-black bg-white px-4 py-2 font-mono text-xs font-bold uppercase text-black shadow-[2px_2px_0px_#000000] hover:bg-gray-100"
+                >
+                  CANCEL
+                </button>
+                <button
+                  type="button"
+                  disabled={
+                    !modalBrief.productName.trim() ||
+                    !modalBrief.productDescription.trim() ||
+                    modalBrief.platforms.length === 0
+                  }
+                  onClick={() => {
+                    setBrief(modalBrief);
+                    setCustomModalOpen(false);
+                    handleLaunch(modalBrief);
+                  }}
+                  className="inline-flex items-center gap-2 border-2 border-black bg-[#10B981] px-5 py-2 font-mono text-xs font-black uppercase text-black shadow-[4px_4px_0px_#000000] transition hover:translate-x-[1px] hover:translate-y-[1px] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:opacity-50"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  <span>DISPATCH BESPOKE RUN</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

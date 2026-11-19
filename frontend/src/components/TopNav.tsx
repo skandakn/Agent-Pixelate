@@ -5,6 +5,7 @@ import {
   Download,
   FileJson,
   PanelLeft,
+  Plus,
   ShieldCheck,
   Sparkles,
   Wifi,
@@ -22,6 +23,7 @@ interface TopNavProps {
   assets: CampaignAssets | null;
   onToggleMockMode: () => void;
   onOpenMobileDrawer: () => void;
+  onNewCustomRun?: () => void;
   onExportJson: () => void;
   onExportZip: () => void;
   isExportingZip: boolean;
@@ -36,6 +38,7 @@ export function TopNav({
   assets,
   onToggleMockMode,
   onOpenMobileDrawer,
+  onNewCustomRun,
   onExportJson,
   onExportZip,
   isExportingZip,
@@ -104,6 +107,18 @@ export function TopNav({
 
         {/* Right: Operational Controls & Brutalist Export CTAs */}
         <div className="flex items-center gap-2.5">
+          {onNewCustomRun && (
+            <button
+              type="button"
+              onClick={onNewCustomRun}
+              title="Launch a custom campaign brief for any product"
+              className="inline-flex items-center gap-1.5 border-2 border-black bg-[#10B981] px-3.5 py-1.5 font-mono text-xs font-black uppercase text-black shadow-[2px_2px_0px_#000000] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
+            >
+              <Plus className="h-3.5 w-3.5 stroke-[3]" />
+              <span>+ NEW RUN</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onToggleMockMode}
