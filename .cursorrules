@@ -1,0 +1,25 @@
+# Agent Pixelate — Cursor & AI Agent Development Rules
+
+Always adhere strictly to the engineering craft and hackathon criteria defined in AGENTS.md:
+
+1. Testing Mandate:
+   - Run `cd frontend && npm test` and `python -m pytest orchestrator/tests -v` before committing.
+   - Every new feature, endpoint, or component must have corresponding unit tests.
+   - All tests and `npm run build` must pass with 0 errors.
+
+2. Secrets & Config:
+   - NEVER hardcode API keys, secrets, or bearer tokens in code.
+   - Always update `.env.example`, `frontend/.env.example`, and `orchestrator/.env.example` when adding environment variables.
+   - Use `orchestrator.security.secrets` and `mask_secret()` for credentials.
+
+3. Frontend State:
+   - Use Zustand (`frontend/src/store/useCampaignStore.ts`) for all global or cross-component state.
+   - Avoid creating multiple React Context providers or disjointed local state.
+
+4. Observability & Error Handling:
+   - Use structured JSON logging (`orchestrator.logging_config`) with `X-Correlation-ID`.
+   - Ensure Next.js error boundaries (`frontend/src/app/error.tsx`) handle runtime issues gracefully.
+
+5. Documentation:
+   - Include clear inline comments explaining multi-agent handoffs, canvas operations, and state transitions.
+   - Keep `README.md` diagrams and documentation updated.
