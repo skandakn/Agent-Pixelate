@@ -67,7 +67,7 @@ function InteractiveThreeDGateView({
             <Sparkles className="h-3.5 w-3.5" />
           </div>
           <span className="font-display text-sm font-bold tracking-tight text-white">
-            Agent Pixelate
+            Pixelate
           </span>
         </div>
       </header>
@@ -80,7 +80,7 @@ function InteractiveThreeDGateView({
           </div>
 
           <h1 className="mt-5 font-display text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            Agent Pixelate
+            Pixelate
           </h1>
 
           <p className="mt-2 text-xs leading-relaxed text-slate-300 sm:text-sm">

@@ -237,7 +237,7 @@ def render_studio_placeholder_png(
     meta_font = _load_font(max(15, int(min_dim * 0.020)), bold=False)
 
     # Channel & Aspect Pill
-    badge_text = f"{platform.upper().replace('_', ' ')}  •  {aspect_ratio}  •  AGENT PIXELATE"
+    badge_text = f"{platform.upper().replace('_', ' ')}  •  {aspect_ratio}  •  PIXELATE"
     draw.text((tx, ty), badge_text, fill=(*c_accent, 255), font=badge_font)
     ty += int(min_dim * 0.055)
 

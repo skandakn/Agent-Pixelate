@@ -365,7 +365,7 @@ function adaptBackendCampaignToAssets(
       if (pLower.includes("meta") || pLower.includes("ad") || pLower.includes("banner")) {
         const cleanDomain =
           brief.productName.toLowerCase().replace(/[^a-z0-9]/g, "") ||
-          "agentpixelate";
+          "pixelate";
         metaAds.push({
           id: `${backend.campaign_id}-meta-${idx + 1}`,
           angle: pc.subheadline || "Direct Response Conversion",
@@ -782,7 +782,7 @@ export function launchCampaignSession(
         sender: "System",
         type: "status",
         title: "Campaign Brief Dispatched",
-        message: `Submitted "${brief.productName}" to Agent Pixelate Orchestrator (${campaignId}).`,
+        message: `Submitted "${brief.productName}" to Pixelate Orchestrator (${campaignId}).`,
       });
 
       const wsTarget = data.ws_url?.startsWith("ws")

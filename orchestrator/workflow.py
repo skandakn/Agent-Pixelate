@@ -2270,7 +2270,7 @@ class CampaignCoordinator:
     </g>
   </g>
 
-  <text x="62" y="{height - 46}" fill="rgba(255,255,255,0.42)" font-family="monospace" font-size="11" letter-spacing="1.5">AGENT PIXELATE // LIVE ORCHESTRATOR RENDER</text>
+  <text x="62" y="{height - 46}" fill="rgba(255,255,255,0.42)" font-family="monospace" font-size="11" letter-spacing="1.5">PIXELATE // LIVE ORCHESTRATOR RENDER</text>
   <text x="{width - 62}" y="{height - 46}" text-anchor="end" fill="rgba(255,255,255,0.42)" font-family="monospace" font-size="11">BAND SHARED ROOM</text>
 </svg>
 """

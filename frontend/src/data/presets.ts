@@ -513,7 +513,7 @@ export function buildSimulatedCampaignAssets(
     },
   ];
 
-  const cleanDomain = product.toLowerCase().replace(/[^a-z0-9]/g, "") || "agentpixelate";
+  const cleanDomain = product.toLowerCase().replace(/[^a-z0-9]/g, "") || "pixelate";
 
   const metaAds: MetaAdVariant[] = [
     {
@@ -550,7 +550,7 @@ export function buildSimulatedCampaignAssets(
     `#${baseTag}`,
     ...motifTags[motif],
     `#${tone}Design`,
-    "#AgentPixelate",
+    "#Pixelate",
   ];
 
   const productNameLower = brief.productName.toLowerCase();

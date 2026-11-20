@@ -42,7 +42,7 @@ export function TopNav({
           </div>
           <div className="flex items-baseline gap-2">
             <span className="font-display text-base font-black tracking-tight text-black sm:text-lg">
-              AGENT PIXELATE
+              PIXELATE
             </span>
             <span className="hidden font-mono text-[10px] font-bold uppercase tracking-widest text-black/50 sm:inline">
               STUDIO

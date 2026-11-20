@@ -283,7 +283,7 @@ class BandAdapter:
     ) -> BandRoom:
         """Create a dedicated task-scoped collaboration room for a campaign."""
         participants = [AgentHandle.VISUAL.value, AgentHandle.COPY.value]
-        room_title = f"Agent Pixelate · {brand_name} ({campaign_id})"
+        room_title = f"Pixelate · {brand_name} ({campaign_id})"
         transport: Literal["band", "local_fallback"] = self.active_transport
         room_id = f"room_{campaign_id}"
         metadata: dict[str, Any] = {"campaign_id": campaign_id, "brand_name": brand_name}

@@ -496,7 +496,7 @@ export async function renderAdPosterToCanvas(config: AdPosterConfig): Promise<HT
     ctx.textAlign = "left";
     ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
     ctx.font = "600 12px monospace";
-    ctx.fillText(`AUTHENTICATED BY AGENT PIXELATE NEURAL MESH`, 60, height - 78);
+    ctx.fillText(`AUTHENTICATED BY PIXELATE NEURAL MESH`, 60, height - 78);
   }
 
   return canvas;

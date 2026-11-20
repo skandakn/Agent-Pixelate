@@ -20,7 +20,7 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
-    app_name: str = "Agent Pixelate Orchestrator"
+    app_name: str = "Pixelate Orchestrator"
     app_version: str = "1.0.0"
     environment: str = Field(default="development")
     log_level: str = Field(default="INFO")

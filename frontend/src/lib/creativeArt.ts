@@ -218,7 +218,7 @@ export function generateCreativeSvg(opts: CreativeArtOptions): {
   </g>
 
   <!-- Bottom hairline footer -->
-  <text x="64" y="532" fill="rgba(255,255,255,0.4)" font-family="monospace" font-size="11" letter-spacing="1.5">AGENT PIXELATE // STUDIO RENDER 0${opts.variant + 1}</text>
+  <text x="64" y="532" fill="rgba(255,255,255,0.4)" font-family="monospace" font-size="11" letter-spacing="1.5">PIXELATE // STUDIO RENDER 0${opts.variant + 1}</text>
   <text x="836" y="532" text-anchor="end" fill="rgba(255,255,255,0.4)" font-family="monospace" font-size="11">BAND MULTI-AGENT PIPELINE</text>
 </svg>`;
 
