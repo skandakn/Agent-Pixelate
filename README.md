@@ -10,7 +10,7 @@ Powered by the **BAND Multi-Agent Protocol**, **Google Gemini**, **Next.js 14**,
 
 [![Live Demo](https://img.shields.io/badge/🌐_Live_Website-agent--pixelate.onrender.com-00E599?style=for-the-badge&logo=render&logoColor=black)](https://agent-pixelate.onrender.com)
 [![CI/CD](https://img.shields.io/github/actions/workflow/status/skandakn/Agent-Pixelate/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI%2FCD)](https://github.com/skandakn/Agent-Pixelate/actions)
-[![Tests](https://img.shields.io/badge/Tests-29%2F29%20Passing-10B981?style=for-the-badge&logo=pytest&logoColor=white)](https://github.com/skandakn/Agent-Pixelate)
+[![Tests](https://img.shields.io/badge/Tests-36%2F36%20Passing-10B981?style=for-the-badge&logo=pytest&logoColor=white)](https://github.com/skandakn/Agent-Pixelate)
 [![Frontend](https://img.shields.io/badge/Frontend-Next.js%2014.2%20App%20Router-black?style=for-the-badge&logo=next.js&logoColor=white)](https://github.com/skandakn/Agent-Pixelate)
 [![Backend](https://img.shields.io/badge/Backend-FastAPI%20%2B%20Python%203.11-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://github.com/skandakn/Agent-Pixelate)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
@@ -212,7 +212,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 The codebase is fortified with comprehensive automated test suites across both backend and frontend:
 
-### Backend Tests (14/14 Passing)
+### Backend Tests (17/17 Passing)
 ```bash
 # Run complete pytest suite from repository root
 uv run pytest
@@ -220,9 +220,10 @@ uv run pytest
 - `test_orchestrator.py`: Strict schema validation, end-to-end fallback pipeline, static asset serving, and REST endpoints.
 - `test_band_collaboration.py`: BAND control plane, focus windows, critic audits, and cross-session memory federation.
 - `test_security_and_logging.py`: Credential masking, SecretManager provider fallback, and audit logging.
+- `test_video_renderer.py`: Kinetic video generation, procedural character animation, audio waveforms, and MP4 export.
 - `test_agents.py`: AdaL/AdalFlow multi-agent harness, Finch skill execution, and structured memory parsing.
 
-### Frontend Tests (15/15 Passing)
+### Frontend Tests (19/19 Passing)
 ```bash
 cd frontend
 npm run test
@@ -230,6 +231,7 @@ npm run test
 - `adPosterRenderer.test.ts`: Theme geometry, dimensions, and styling rules.
 - `productImagery.test.ts`: Category detection, photo matching, and metadata generation.
 - `campaignClient.test.ts`: REST/WebSocket client adapters, fallback normalizers, and asset hydration.
+- `characterAnimation.test.ts`: Procedural canvas character animation, lip sync, and audio visualizer.
 - `useCampaignStore.test.ts`: Zustand store state transitions, event accumulation, and parameter updates.
 
 ### Production Static Build
